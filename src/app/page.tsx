@@ -3,7 +3,7 @@ import { Stethoscope, Building, ArrowRight, Shield, Zap, Users } from 'lucide-re
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
+    <div className="min-h-screen bg-white">
       {/* Header */}
       <nav className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

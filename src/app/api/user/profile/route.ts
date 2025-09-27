@@ -4,7 +4,7 @@ import { withAnyAuth, type AuthenticatedRequest } from '@/lib/middleware'
 import { hcpProfileUpdateSchema, pharmaProfileUpdateSchema } from '@/lib/validations'
 import { UserType } from '@prisma/client'
 
-async function GET(req: AuthenticatedRequest) {
+async function getProfile(req: AuthenticatedRequest) {
   try {
     const user = await db.user.findUnique({
       where: { id: req.user.userId },
@@ -32,7 +32,7 @@ async function GET(req: AuthenticatedRequest) {
   }
 }
 
-async function PUT(req: AuthenticatedRequest) {
+async function updateProfile(req: AuthenticatedRequest) {
   try {
     const body = await req.json()
     const userId = req.user.userId
@@ -96,4 +96,5 @@ async function PUT(req: AuthenticatedRequest) {
   }
 }
 
-export { withAnyAuth(GET) as GET, withAnyAuth(PUT) as PUT }
+export const GET = withAnyAuth(getProfile)
+export const PUT = withAnyAuth(updateProfile)

@@ -20,6 +20,10 @@ async function getDrugs(req: AuthenticatedRequest) {
       ]
     }
 
+    // Get total count of all drugs (regardless of search)
+    const totalDrugsCount = await db.drug.count()
+    
+    // Get filtered results
     const drugs = await db.drug.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -35,6 +39,7 @@ async function getDrugs(req: AuthenticatedRequest) {
 
     return NextResponse.json({
       drugs: parsedDrugs,
+      totalDrugsAvailable: totalDrugsCount, // Total count of all drugs in database
       pagination: {
         page: 1,
         limit: 50,

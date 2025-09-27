@@ -52,6 +52,7 @@ export default function HCPDashboard() {
   const [user, setUser] = useState<any>(null)
   const [activeTab, setActiveTab] = useState('drugs')
   const [drugs, setDrugs] = useState<Drug[]>([])
+  const [totalDrugsCount, setTotalDrugsCount] = useState(0)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [savedDrugs, setSavedDrugs] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -89,6 +90,7 @@ export default function HCPDashboard() {
       if (drugsResponse.ok) {
         const drugsData = await drugsResponse.json()
         setDrugs(drugsData.drugs || [])
+        setTotalDrugsCount(drugsData.totalDrugsAvailable || 0)
       }
 
       // Load notifications
@@ -128,6 +130,10 @@ export default function HCPDashboard() {
       if (response.ok) {
         const data = await response.json()
         setDrugs(data.drugs || [])
+        // Update total count if it's provided (it should be in every API response now)
+        if (data.totalDrugsAvailable !== undefined) {
+          setTotalDrugsCount(data.totalDrugsAvailable)
+        }
       }
     } catch (error) {
       setError('Search failed')
@@ -154,6 +160,10 @@ export default function HCPDashboard() {
 
   const unsaveDrug = async (savedDrugId: string) => {
     setRemovingDrug(savedDrugId)
+    
+    // Store the original state in case we need to revert
+    const originalSavedDrugs = savedDrugs
+    
     try {
       // Optimistically update UI by removing the drug from the list immediately
       setSavedDrugs(prevSaved => prevSaved.filter(saved => saved.id !== savedDrugId))
@@ -166,17 +176,23 @@ export default function HCPDashboard() {
       if (response.ok) {
         // Success - the optimistic update was correct
         console.log('Drug successfully removed from saved list')
+        setError('') // Clear any previous errors
       } else {
-        // Error - revert the optimistic update by reloading data
-        console.error('Failed to remove drug from saved list')
-        loadData() // Reload to get correct state
+        // Error - revert the optimistic update
+        console.error('Failed to remove drug from saved list, status:', response.status)
+        setSavedDrugs(originalSavedDrugs)
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        setError(errorData.error || 'Failed to remove drug')
       }
     } catch (error) {
       console.error('Error removing saved drug:', error)
-      // Revert the optimistic update by reloading data
-      loadData()
+      // Revert the optimistic update
+      setSavedDrugs(originalSavedDrugs)
+      setError('Network error. Please try again.')
     } finally {
       setRemovingDrug(null)
+      // Clear error after a few seconds
+      setTimeout(() => setError(''), 5000)
     }
   }
 
@@ -257,7 +273,7 @@ export default function HCPDashboard() {
               <div className="text-gray-500">Saved Drugs</div>
             </div>
             <div className="bg-white rounded-lg p-3">
-              <div className="font-semibold text-blue-600">{drugs.length}</div>
+              <div className="font-semibold text-blue-600">{totalDrugsCount.toLocaleString()}</div>
               <div className="text-gray-500">Drugs Available</div>
             </div>
           </div>
@@ -287,6 +303,13 @@ export default function HCPDashboard() {
           </nav>
         </div>
 
+        {/* Error Display */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
+        )}
+
         {/* Drug Database Tab */}
         {activeTab === 'drugs' && (
           <div className="space-y-6">
@@ -297,7 +320,7 @@ export default function HCPDashboard() {
                 <input
                   type="text"
                   placeholder="Search drugs by name, active ingredient, or manufacturer..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}

@@ -97,7 +97,7 @@ export default function HCPRegister() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full text-center">
           <div className="flex items-center justify-center mb-6">
             <div className="flex items-center justify-center w-16 h-16 bg-green-100 rounded-full">
@@ -112,7 +112,7 @@ export default function HCPRegister() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-white flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl w-full space-y-8">
         <div>
           <div className="flex items-center justify-center">

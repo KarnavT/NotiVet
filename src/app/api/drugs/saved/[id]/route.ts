@@ -1,20 +1,33 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { withHCPAuth, type AuthenticatedRequest } from '@/lib/middleware'
-
-interface RouteParams {
-  params: {
-    id: string
-  }
-}
 
 // DELETE - Remove saved drug
-async function deleteSavedDrug(req: AuthenticatedRequest, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  // Apply authentication middleware inline
+  const authHeader = request.headers.get('authorization')
+  const token = authHeader?.replace('Bearer ', '')
+
+  if (!token) {
+    return NextResponse.json({ error: 'No token provided' }, { status: 401 })
+  }
+
+  // Import verifyToken here to avoid circular imports
+  const { verifyToken } = await import('@/lib/auth')
+  const user = verifyToken(token)
+  
+  if (!user) {
+    return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+  }
+
+  if (user.userType !== 'HCP') {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+
   try {
     const savedDrug = await db.savedDrug.findFirst({
       where: {
         id: params.id,
-        userId: req.user.userId
+        userId: user.userId
       }
     })
 
@@ -33,5 +46,3 @@ async function deleteSavedDrug(req: AuthenticatedRequest, { params }: RouteParam
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-
-export const DELETE = withHCPAuth(deleteSavedDrug)

@@ -99,6 +99,13 @@ model Drug {
   withdrawalTime    String?
   approvalDate      DateTime?
   
+  // New fields from CSV data
+  productCode       String?   // Product Code from USDA
+  establishmentCode String?   // Establishment Code
+  subsidiaries      String?   // Subsidiaries information
+  tradeName         String?   // Trade Name(s)
+  distributors      String?   // Distributor(s)
+  
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 

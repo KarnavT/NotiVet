@@ -1,5 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { execSync } from 'child_process'
+import { existsSync } from 'fs'
 
 const prisma = new PrismaClient()
 
@@ -107,10 +109,27 @@ async function main() {
     })
   }
 
-  console.log('Database seeded successfully!')
+  // Import drugs from CSV if available and not already imported
+  const drugCount = await prisma.drug.count()
+  if (drugCount <= drugs.length && existsSync('./data/AnimalDrugs.csv')) {
+    console.log('\n📊 Importing drugs from CSV...')
+    try {
+      execSync('npx tsx scripts/import-drugs.ts', { 
+        stdio: 'inherit',
+        cwd: process.cwd()
+      })
+    } catch (error) {
+      console.log('ℹ️  CSV import script not available or failed, continuing with basic seed data only')
+    }
+  }
+
+  console.log('\n🎉 Database seeded successfully!')
   console.log(`Created HCP user: ${hcpUser.email}`)
   console.log(`Created Pharma user: ${pharmaUser.email}`)
   console.log(`Created ${drugs.length} sample drugs`)
+  
+  const finalDrugCount = await prisma.drug.count()
+  console.log(`Total drugs in database: ${finalDrugCount}`)
 }
 
 main()
