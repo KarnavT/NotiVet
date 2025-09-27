@@ -5,7 +5,7 @@ import { notificationSchema } from '@/lib/validations'
 
 async function getNotifications(req: AuthenticatedRequest) {
   try {
-    let notifications = []
+    let notifications: any[] = []
 
     // For HCP users, get their received notifications (but there won't be any initially)
     if (req.user.userType === 'HCP') {

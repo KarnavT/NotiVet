@@ -113,7 +113,7 @@ export default function HCPDashboard() {
         const savedDrugsList = savedData.savedDrugs || []
         setSavedDrugs(savedDrugsList)
         // Update the set of saved drug IDs
-        const drugIds = new Set(savedDrugsList.map((saved: any) => saved.drug.id))
+        const drugIds = new Set<string>(savedDrugsList.map((saved: any) => saved.drug.id as string))
         setSavedDrugIds(drugIds)
       }
     } catch (error) {
@@ -158,7 +158,11 @@ export default function HCPDashboard() {
 
       if (response.ok) {
         // Add to saved drugs set immediately for instant UI feedback
-        setSavedDrugIds(prev => new Set([...prev, drugId]))
+        setSavedDrugIds(prev => {
+          const newSet = new Set(prev)
+          newSet.add(drugId)
+          return newSet
+        })
         
         // Reload data to sync with backend
         loadData()
@@ -180,10 +184,11 @@ export default function HCPDashboard() {
     // Store the original state in case we need to revert
     const originalSavedDrugs = savedDrugs
     
+    // Find the drug ID from the saved drug to remove from the set
+    const savedDrug = savedDrugs.find(saved => saved.id === savedDrugId)
+    const drugIdToRemove = savedDrug?.drug?.id
+    
     try {
-      // Find the drug ID from the saved drug to remove from the set
-      const savedDrug = savedDrugs.find(saved => saved.id === savedDrugId)
-      const drugIdToRemove = savedDrug?.drug?.id
       
       // Optimistically update UI by removing the drug from the list immediately
       setSavedDrugs(prevSaved => prevSaved.filter(saved => saved.id !== savedDrugId))
@@ -212,7 +217,11 @@ export default function HCPDashboard() {
         setSavedDrugs(originalSavedDrugs)
         // Also restore to saved drug IDs set
         if (drugIdToRemove) {
-          setSavedDrugIds(prev => new Set([...prev, drugIdToRemove]))
+          setSavedDrugIds(prev => {
+            const newSet = new Set(prev)
+            newSet.add(drugIdToRemove)
+            return newSet
+          })
         }
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
         setError(errorData.error || 'Failed to remove drug')
@@ -223,10 +232,14 @@ export default function HCPDashboard() {
       setSavedDrugs(originalSavedDrugs)
       // Also restore to saved drug IDs set
       if (drugIdToRemove) {
-        setSavedDrugIds(prev => new Set([...prev, drugIdToRemove]))
+        setSavedDrugIds(prev => {
+          const newSet = new Set(prev)
+          newSet.add(drugIdToRemove)
+          return newSet
+        })
       }
       setError('Network error. Please try again.')
-    }
+    } finally {
       setRemovingDrug(null)
       // Clear error after a few seconds
       setTimeout(() => setError(''), 5000)
@@ -416,7 +429,7 @@ export default function HCPDashboard() {
                     <div className="flex items-center">
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-700 border border-blue-200">
                         <span className="w-2 h-2 bg-blue-400 rounded-full mr-2"></span>
-                        Species: {drug.species.join(', ')}
+                        Species: {(drug as any).species?.join ? (drug as any).species.join(', ') : (drug as any).species}
                       </span>
                     </div>
                     
@@ -449,12 +462,12 @@ export default function HCPDashboard() {
                     )}
                   </div>
 
-                  {(drug.usage || drug.description) && (
+                  {((drug as any).usage || drug.description) && (
                     <div className="mt-4 pt-4 border-t border-gray-100">
                       <div className="mb-2">
                         <span className="text-sm font-medium text-gray-900">Description:</span>
                       </div>
-                      <p className="text-gray-700 leading-relaxed">{drug.usage || drug.description}</p>
+                      <p className="text-gray-700 leading-relaxed">{(drug as any).usage || drug.description}</p>
                     </div>
                   )}
                 </div>
@@ -606,12 +619,12 @@ export default function HCPDashboard() {
                   )}
                 </div>
                 
-                {(saved.drug.usage || saved.drug.description) && (
+                {((saved.drug as any).usage || saved.drug.description) && (
                   <div className="mt-4 pt-4 border-t border-gray-100">
                     <div className="mb-2">
                       <span className="text-sm font-medium text-gray-900">Description:</span>
                     </div>
-                    <p className="text-gray-700 leading-relaxed">{saved.drug.usage || saved.drug.description}</p>
+                    <p className="text-gray-700 leading-relaxed">{(saved.drug as any).usage || saved.drug.description}</p>
                   </div>
                 )}
               </div>
