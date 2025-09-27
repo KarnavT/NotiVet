@@ -157,7 +157,7 @@ async function createNotification(req: AuthenticatedRequest) {
     const notification = await db.notification.create({
       data: {
         senderId: req.user.userId,
-        drugId: newDrug.id,
+        // Not persisted: Prisma Notification model has no drugId column; include drug info text instead
         title: validatedData.title,
         content: validatedData.content,
         drugInfo: `New Drug: ${validatedData.drugName}` + (validatedData.drugInfo ? ` - ${validatedData.drugInfo}` : ''),

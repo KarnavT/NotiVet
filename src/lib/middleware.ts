@@ -5,8 +5,12 @@ export interface AuthenticatedRequest extends NextRequest {
   user: JWTPayload
 }
 
-export function withAuth(handler: (req: AuthenticatedRequest) => Promise<Response>) {
-  return async (req: NextRequest): Promise<Response> => {
+// Preserve and forward additional handler arguments (e.g., Next.js route context)
+export function withAuth<T extends (req: AuthenticatedRequest, ...args: any[]) => Promise<Response>>(handler: T) {
+  return async (
+    req: NextRequest,
+    ...args: Parameters<T> extends [any, ...infer R] ? R : never
+  ): Promise<Response> => {
     const authHeader = req.headers.get('authorization')
     const token = extractTokenFromHeader(authHeader)
 
@@ -28,13 +32,16 @@ export function withAuth(handler: (req: AuthenticatedRequest) => Promise<Respons
     const authenticatedReq = req as AuthenticatedRequest
     authenticatedReq.user = user
 
-    return handler(authenticatedReq)
+    return handler(authenticatedReq, ...(args as any))
   }
 }
 
 export function withRole(allowedRoles: string[]) {
-  return function(handler: (req: AuthenticatedRequest) => Promise<Response>) {
-    return withAuth(async (req: AuthenticatedRequest) => {
+  return function <T extends (req: AuthenticatedRequest, ...args: any[]) => Promise<Response>>(handler: T) {
+    return withAuth(async (
+      req: AuthenticatedRequest,
+      ...args: Parameters<T> extends [any, ...infer R] ? R : never
+    ): Promise<Response> => {
       if (!allowedRoles.includes(req.user.userType)) {
         return new Response(JSON.stringify({ error: 'Insufficient permissions' }), {
           status: 403,
@@ -42,7 +49,7 @@ export function withRole(allowedRoles: string[]) {
         })
       }
 
-      return handler(req)
+      return handler(req, ...(args as any))
     })
   }
 }

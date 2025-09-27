@@ -2,6 +2,28 @@
 
 NotiVet is a comprehensive platform that connects pharmaceutical companies with veterinary professionals through targeted drug information and notifications. Built with Next.js, Prisma, and PostgreSQL.
 
+## One-command local demo (macOS)
+
+Prerequisites:
+- Docker Desktop running
+- ngrok installed and authenticated (ngrok config add-authtoken <token>)
+
+Run this from the project root to spin up everything (DB, Prisma, Next.js, and ngrok) and print a public URL you can open on two laptops:
+
+```bash
+bash scripts/run_demo.sh
+```
+
+What it does:
+- Starts a local PostgreSQL in Docker on host port 6543 (container: notivet-postgres)
+- Applies the Prisma schema and seeds demo users/drugs
+- Starts Next.js in production on 127.0.0.1:3000
+- Starts ngrok and prints the HTTPS URL to use for your demo
+
+Demo users:
+- Pharma: contact@pharmaco.com / password123
+- HCP: dr.smith@vetclinic.com / password123
+
 ## Features
 
 - **Dual User Types**: Separate authentication and features for HCPs and pharmaceutical companies
