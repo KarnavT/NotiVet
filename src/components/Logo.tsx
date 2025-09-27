@@ -33,11 +33,12 @@ export default function Logo({
     const iconContent = hasCustomLogo ? (
       <div className={`${sizes.container} rounded-lg overflow-hidden ${className}`}>
         <Image
-          src="/images/NotiVet-logo.png" // Replace with your logo path
+          src="/images/NotiVet-logo.png"
           alt="NotiVet Logo"
-          width={48}
-          height={48}
+          width={80}
+          height={80}
           className="w-full h-full object-contain"
+          priority
         />
       </div>
     ) : (
@@ -73,11 +74,12 @@ export default function Logo({
       {hasCustomLogo ? (
         <div className={`${sizes.container} rounded-lg overflow-hidden mr-3`}>
           <Image
-            src="/images/NotiVet-logo.png" // Replace with your logo path
+            src="/images/NotiVet-logo.png"
             alt="NotiVet Logo"
-            width={48}
-            height={48}
+            width={80}
+            height={80}
             className="w-full h-full object-contain"
+            priority
           />
         </div>
       ) : (

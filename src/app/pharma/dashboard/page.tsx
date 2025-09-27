@@ -15,6 +15,7 @@ import {
   Calendar
 } from 'lucide-react'
 import Logo from '@/components/Logo'
+import CampaignDetailsModal from '@/components/CampaignDetailsModal'
 
 interface Notification {
   id: string
@@ -25,6 +26,30 @@ interface Notification {
   createdAt: string
   recipientCount: number
   activities: any[]
+  drug?: {
+    id: string
+    name: string
+    genericName?: string
+    manufacturer: string
+    activeIngredient: string
+    species: string[]
+    deliveryMethods: string[]
+    description?: string
+    dosage?: string
+    contraindications?: string
+    sideEffects?: string
+    warnings?: string
+    faradInfo?: string
+    withdrawalTime?: string
+  }
+  analytics?: {
+    sent: number
+    opened: number
+    clicked: number
+    openRate: number
+    clickRate: number
+    clickThroughRate: number
+  }
 }
 
 interface Analytics {
@@ -68,6 +93,8 @@ export default function PharmaDashboard() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [selectedCampaign, setSelectedCampaign] = useState<Notification | null>(null)
+  const [showCampaignDetails, setShowCampaignDetails] = useState(false)
 
   const speciesOptions = [
     'CANINE', 'FELINE', 'EQUINE', 'BOVINE', 
@@ -185,6 +212,16 @@ export default function PharmaDashboard() {
         ? prev.deliveryMethods.filter(m => m !== method)
         : [...prev.deliveryMethods, method]
     }))
+  }
+
+  const handleViewCampaignDetails = (notification: Notification) => {
+    setSelectedCampaign(notification)
+    setShowCampaignDetails(true)
+  }
+
+  const handleCloseCampaignDetails = () => {
+    setShowCampaignDetails(false)
+    setSelectedCampaign(null)
   }
 
   const handleLogout = () => {
@@ -590,10 +627,22 @@ export default function PharmaDashboard() {
 
                   <div className="flex justify-between items-center pt-4 border-t">
                     <div className="text-sm text-gray-700">
-                      Opens: {notification.activities.filter(a => a.status === 'OPENED').length} • 
-                      Clicks: {notification.activities.filter(a => a.status === 'CLICKED').length}
+                      {notification.analytics ? (
+                        <>
+                          Opens: {notification.analytics.opened} ({notification.analytics.openRate}%) • 
+                          Clicks: {notification.analytics.clicked} ({notification.analytics.clickRate}%)
+                        </>
+                      ) : (
+                        <>
+                          Opens: {notification.activities.filter(a => a.status === 'OPENED').length} • 
+                          Clicks: {notification.activities.filter(a => a.status === 'CLICKED').length}
+                        </>
+                      )}
                     </div>
-                    <button className="flex items-center text-green-600 hover:text-green-800">
+                    <button 
+                      onClick={() => handleViewCampaignDetails(notification)}
+                      className="flex items-center text-green-600 hover:text-green-800 transition-colors"
+                    >
                       <Eye className="w-4 h-4 mr-1" />
                       View Details
                     </button>
@@ -689,6 +738,13 @@ export default function PharmaDashboard() {
           </div>
         )}
       </div>
+      
+      {/* Campaign Details Modal */}
+      <CampaignDetailsModal
+        isOpen={showCampaignDetails}
+        onClose={handleCloseCampaignDetails}
+        campaign={selectedCampaign}
+      />
     </div>
   )
 }

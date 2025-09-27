@@ -61,7 +61,7 @@ export default function PharmaLogin() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <div className="flex items-center justify-center">
-            <Logo size="2xl" variant="icon" className="bg-green-100 rounded-full" clickable={false} />
+            <Logo size="2xl" variant="icon" clickable={false} />
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Pharma Login
