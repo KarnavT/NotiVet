@@ -17,6 +17,7 @@ import {
   MessageSquare,
   Check,
 } from 'lucide-react'
+import DrugCard from '@/components/DrugCard'
 
 interface Drug {
   id: string
@@ -63,6 +64,7 @@ export default function HCPDashboard() {
   const [chatbotAnswer, setChatbotAnswer] = useState('')
   const [chatbotSources, setChatbotSources] = useState<string[]>([])
   const [chatbotError, setChatbotError] = useState('')
+  const [chatbotMatchedDrugs, setChatbotMatchedDrugs] = useState<Drug[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [removingDrug, setRemovingDrug] = useState<string | null>(null)
@@ -174,6 +176,7 @@ export default function HCPDashboard() {
       const data = await response.json()
       setChatbotAnswer(data.answer || '')
       setChatbotSources(data.sources || [])
+      setChatbotMatchedDrugs(Array.isArray(data.matchedDrugs) ? data.matchedDrugs : [])
     } catch (e) {
       setChatbotError('Network error while contacting chatbot')
     } finally {
@@ -182,32 +185,50 @@ export default function HCPDashboard() {
   }
 
   const saveDrug = async (drugId: string) => {
+    // Optimistically mark as saved for instant feedback
+    setSavedDrugIds(prev => {
+      const newSet = new Set(prev)
+      newSet.add(String(drugId))
+      return newSet
+    })
+
     try {
       const response = await fetch('/api/drugs/saved', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ drugId })
+        body: JSON.stringify({ drugId: String(drugId) })
       })
 
       if (response.ok) {
-        // Add to saved drugs set immediately for instant UI feedback
-        setSavedDrugIds(prev => {
-          const newSet = new Set(prev)
-          newSet.add(drugId)
-          return newSet
-        })
-        
-        // Reload data to sync with backend
-        loadData()
+        // Sync with backend to update counts and saved list
+        await loadData()
+        return
       }
-    } catch (error) {
-      console.error('Error saving drug:', error)
-      // Remove from saved drugs set if there was an error
+
+      // Handle known "already saved" response as success
+      const errJson = await response.json().catch(() => ({} as any))
+      const alreadySaved = response.status === 400 && (errJson?.error || '').toLowerCase().includes('already')
+      if (alreadySaved) {
+        await loadData()
+        return
+      }
+
+      // If other error, revert optimistic change
       setSavedDrugIds(prev => {
         const newSet = new Set(prev)
-        newSet.delete(drugId)
+        newSet.delete(String(drugId))
         return newSet
       })
+      setError(errJson?.error || 'Failed to save drug')
+    } catch (error) {
+      console.error('Error saving drug:', error)
+      // Revert optimistic update on network error
+      setSavedDrugIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(String(drugId))
+        return newSet
+      })
+      setError('Network error. Please try again.')
     }
   }
 
@@ -422,89 +443,13 @@ export default function HCPDashboard() {
             {/* Drug Results */}
             <div className="grid gap-6">
               {drugs.map((drug) => (
-                <div key={drug.id} className="group bg-white rounded-xl border-2 border-blue-100 hover:border-blue-300 shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out transform hover:-translate-y-1 p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-900 transition-colors duration-200">{drug.name}</h3>
-                      {drug.genericName && (
-                        <p className="text-gray-600 mt-1 font-medium">Generic: <span className="text-gray-700">{drug.genericName}</span></p>
-                      )}
-                      <div className="flex items-center mt-2 space-x-4">
-                        <div className="flex items-center text-sm text-gray-500">
-                          <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-                          <span className="font-medium text-gray-600">Manufacturer:</span> {drug.manufacturer}
-                        </div>
-                      </div>
-                      <div className="mt-2">
-                        <div className="text-sm text-gray-500">
-                          <span className="font-medium text-gray-600">Active Ingredient:</span> {drug.activeIngredient}
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => !savedDrugIds.has(drug.id) && saveDrug(drug.id)}
-                      disabled={savedDrugIds.has(drug.id)}
-                      className={`flex items-center px-4 py-2 rounded-lg transition-all duration-300 shadow-md ${
-                        savedDrugIds.has(drug.id)
-                          ? 'bg-green-600 text-white cursor-default'
-                          : 'bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-105 hover:shadow-lg'
-                      }`}
-                    >
-                      {savedDrugIds.has(drug.id) ? (
-                        <Check className="w-4 h-4 mr-2 transition-all duration-300 scale-110" />
-                      ) : (
-                        <Heart className="w-4 h-4 mr-2 transition-all duration-300 group-hover:scale-110" />
-                      )}
-                      {savedDrugIds.has(drug.id) ? 'Saved!' : 'Save'}
-                    </button>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <div className="flex items-center">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                        <span className="w-2 h-2 bg-blue-400 rounded-full mr-2"></span>
-                        Species: {(drug as any).species?.join ? (drug as any).species.join(', ') : (drug as any).species}
-                      </span>
-                    </div>
-                    
-                    {drug.dosage && (
-                      <div className="bg-gray-50 rounded-lg p-3 border-l-4 border-blue-400">
-                        <div className="flex items-start">
-                          <div className="flex-shrink-0">
-                            <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                          </div>
-                          <div className="ml-3">
-                            <p className="text-sm font-medium text-gray-900">Dosage</p>
-                            <p className="text-sm text-gray-700">{drug.dosage}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {drug.withdrawalTime && (
-                      <div className="bg-amber-50 rounded-lg p-3 border-l-4 border-amber-400">
-                        <div className="flex items-start">
-                          <div className="flex-shrink-0">
-                            <div className="w-2 h-2 bg-amber-500 rounded-full mt-2"></div>
-                          </div>
-                          <div className="ml-3">
-                            <p className="text-sm font-medium text-gray-900">Withdrawal Time</p>
-                            <p className="text-sm text-gray-700">{drug.withdrawalTime}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {((drug as any).usage || drug.description) && (
-                    <div className="mt-4 pt-4 border-t border-gray-100">
-                      <div className="mb-2">
-                        <span className="text-sm font-medium text-gray-900">Description:</span>
-                      </div>
-                      <p className="text-gray-700 leading-relaxed">{(drug as any).usage || drug.description}</p>
-                    </div>
-                  )}
-                </div>
+                <DrugCard
+                  key={drug.id}
+                  drug={drug as any}
+                  saved={savedDrugIds.has(drug.id)}
+                  onSave={() => !savedDrugIds.has(drug.id) && saveDrug(drug.id)}
+                  context="database"
+                />
               ))}
             </div>
           </div>
@@ -544,9 +489,20 @@ export default function HCPDashboard() {
               <div className="bg-white rounded-lg shadow p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Chatbot Answer</h3>
                 <p className="whitespace-pre-wrap text-gray-800">{chatbotAnswer}</p>
-                {chatbotSources.length > 0 && (
-                  <div className="mt-4 text-sm text-gray-600">
-                    Sources: {chatbotSources.join(', ')}
+                {chatbotMatchedDrugs.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="text-md font-semibold text-gray-900 mb-3">Matched Drugs</h4>
+                    <div className="grid gap-6">
+                      {chatbotMatchedDrugs.map((drug) => (
+                        <DrugCard
+                          key={drug.id}
+                          drug={drug as any}
+                          saved={savedDrugIds.has(drug.id)}
+                          onSave={() => !savedDrugIds.has(drug.id) && saveDrug(drug.id)}
+                          context="chatbot"
+                        />
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
