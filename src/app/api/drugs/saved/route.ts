@@ -2,6 +2,19 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { withHCPAuth, type AuthenticatedRequest } from '@/lib/middleware'
 
+function parseJSONList(input: string | null | undefined) {
+  try {
+    if (!input) return []
+    const v = JSON.parse(input)
+    if (Array.isArray(v)) return v
+    if (typeof v === 'string' && v) return [v]
+    return []
+  } catch {
+    // Fallback: some legacy rows may store a single enum string
+    return typeof input === 'string' && input ? [input] : []
+  }
+}
+
 async function getSavedDrugs(req: AuthenticatedRequest) {
   try {
     const savedDrugs = await db.savedDrug.findMany({
@@ -17,8 +30,8 @@ async function getSavedDrugs(req: AuthenticatedRequest) {
       ...saved,
       drug: {
         ...saved.drug,
-        species: saved.drug.species ? JSON.parse(saved.drug.species) : [],
-        deliveryMethods: saved.drug.deliveryMethods ? JSON.parse(saved.drug.deliveryMethods) : []
+        species: parseJSONList(saved.drug.species),
+        deliveryMethods: parseJSONList(saved.drug.deliveryMethods)
       }
     }))
 
@@ -34,7 +47,23 @@ async function getSavedDrugs(req: AuthenticatedRequest) {
 
 async function saveDrug(req: AuthenticatedRequest) {
   try {
-    const { drugId } = await req.json()
+    // Be robust to malformed JSON bodies
+    let drugId: string | undefined
+    try {
+      const body = await req.json()
+      drugId = body?.drugId
+    } catch {
+      // Fallback to raw text and querystring
+      try {
+        const raw = await req.text()
+        const parsed = raw ? JSON.parse(raw) : {}
+        drugId = parsed?.drugId
+      } catch {}
+      if (!drugId) {
+        const url = new URL(req.url)
+        drugId = url.searchParams.get('drugId') || undefined
+      }
+    }
 
     if (!drugId) {
       return NextResponse.json({ error: 'Drug ID is required' }, { status: 400 })
@@ -61,33 +90,32 @@ async function saveDrug(req: AuthenticatedRequest) {
       return NextResponse.json({ error: 'Drug already saved' }, { status: 400 })
     }
 
-    const savedDrug = await db.savedDrug.create({
-      data: {
-        userId: req.user.userId,
-        drugId: drugId
-      },
-      include: {
-        drug: true
+    try {
+      await db.savedDrug.create({
+        data: {
+          userId: req.user.userId,
+          drugId: drugId
+        }
+      })
+    } catch (e: any) {
+      // Handle unique constraint (already saved) gracefully
+      if (e?.code === 'P2002') {
+        return NextResponse.json({ message: 'Drug already saved' })
       }
-    })
-
-    // Parse JSON strings for response
-    const parsedSavedDrug = {
-      ...savedDrug,
-      drug: {
-        ...savedDrug.drug,
-        species: savedDrug.drug.species ? JSON.parse(savedDrug.drug.species) : [],
-        deliveryMethods: savedDrug.drug.deliveryMethods ? JSON.parse(savedDrug.drug.deliveryMethods) : []
-      }
+      throw e
     }
 
     return NextResponse.json({
-      message: 'Drug saved successfully',
-      savedDrug: parsedSavedDrug
+      message: 'Drug saved successfully'
     })
 
-  } catch (error) {
-    console.error('Save drug error:', error)
+  } catch (error: any) {
+    console.error('Save drug error:', error?.message || error, '\nCode:', error?.code)
+    // Surface Prisma unique constraint as success to keep UX simple
+    if (error?.code === 'P2002') {
+      return NextResponse.json({ message: 'Drug already saved' })
+    }
+    // Include minimal diagnostic to help debug client-side (safe)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
