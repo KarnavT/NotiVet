@@ -146,7 +146,7 @@ async function createNotification(req: AuthenticatedRequest) {
         
         // Check if any HCP specialty matches any target species
         return hcpSpecialties.some((specialty: string) => 
-          validatedData.targetSpecies.includes(specialty)
+          validatedData.targetSpecies.includes(specialty as any)
         )
       } catch (error) {
         console.error('Error parsing HCP specialties:', error)

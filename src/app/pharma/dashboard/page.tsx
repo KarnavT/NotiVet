@@ -298,7 +298,7 @@ export default function PharmaDashboard() {
             {/* New Notification Form */}
             {showNewNotification && (
               <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-                <h4 className="text-lg font-semibold mb-4">Create New Drug Campaign</h4>
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">Create New Drug Campaign</h4>
                 <p className="text-sm text-gray-600 mb-6">Send targeted notifications to veterinary professionals about your new drug while adding it to the database.</p>
                 
                 {error && (
@@ -354,7 +354,7 @@ export default function PharmaDashboard() {
                                 checked={newNotification.targetSpecies.includes(species)}
                                 onChange={() => handleSpeciesChange(species)}
                               />
-                              <span className="text-sm">{species.toLowerCase()}</span>
+                              <span className="text-sm text-gray-900">{species.toLowerCase()}</span>
                             </label>
                           ))}
                         </div>
@@ -436,7 +436,7 @@ export default function PharmaDashboard() {
                               checked={newNotification.deliveryMethods.includes(method)}
                               onChange={() => handleDeliveryMethodChange(method)}
                             />
-                            <span className="text-sm">{method.toLowerCase()}</span>
+                            <span className="text-sm text-gray-900">{method.toLowerCase()}</span>
                           </label>
                         ))}
                       </div>

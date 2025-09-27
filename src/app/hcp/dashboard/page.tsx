@@ -453,7 +453,7 @@ export default function HCPDashboard() {
               >
                 <Icon className="w-4 h-4 mr-2" />
                 {name}
-                {id === 'notifications' && count > 0 && (
+                {id === 'notifications' && count !== undefined && count > 0 && (
                   <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
                     {count}
                   </span>
@@ -621,7 +621,7 @@ export default function HCPDashboard() {
                       </div>
                     </div>
                     <div className="flex space-x-2">
-                      {notification.drugId && (
+                      {notification.drugId ? (
                         <button
                           onClick={() => !savedDrugIds.has(notification.drugId!) && saveDrugFromNotification(notification.drugId!, notification.id)}
                           disabled={savedDrugIds.has(notification.drugId!)}
@@ -630,14 +630,20 @@ export default function HCPDashboard() {
                               ? 'bg-green-600 text-white cursor-default'
                               : 'bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-105 hover:shadow-lg'
                           }`}
+                          title={savedDrugIds.has(notification.drugId!) ? 'Drug already saved' : 'Save this drug to your collection'}
                         >
                           {savedDrugIds.has(notification.drugId!) ? (
                             <Check className="w-4 h-4 mr-2 transition-all duration-300 scale-110" />
                           ) : (
                             <Heart className="w-4 h-4 mr-2 transition-all duration-300 group-hover:scale-110" />
                           )}
-                          {savedDrugIds.has(notification.drugId!) ? 'Saved!' : 'Save'}
+                          {savedDrugIds.has(notification.drugId!) ? 'Saved!' : 'Save Drug'}
                         </button>
+                      ) : (
+                        <div className="flex items-center px-4 py-2 rounded-lg bg-gray-100 text-gray-500">
+                          <MessageSquare className="w-4 h-4 mr-2" />
+                          <span>Info Only</span>
+                        </div>
                       )}
                       {!notification.isRead ? (
                         <button
