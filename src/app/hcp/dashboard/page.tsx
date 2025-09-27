@@ -18,6 +18,7 @@ import {
   Check,
 } from 'lucide-react'
 import DrugCard from '@/components/DrugCard'
+import Logo from '@/components/Logo'
 
 interface Drug {
   id: string
@@ -381,8 +382,7 @@ export default function HCPDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Stethoscope className="w-8 h-8 text-blue-600 mr-3" />
-              <h1 className="text-2xl font-bold text-blue-600">NotiVet</h1>
+              <Logo size="md" variant="full" />
               <span className="ml-4 text-sm text-gray-500">HCP Dashboard</span>
             </div>
             <div className="flex items-center space-x-4">

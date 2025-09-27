@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Building, ArrowRight, Eye, EyeOff, CheckCircle } from 'lucide-react'
+import Logo from '@/components/Logo'
 
 export default function PharmaRegister() {
   const router = useRouter()
@@ -87,9 +88,7 @@ export default function PharmaRegister() {
       <div className="max-w-2xl w-full space-y-8">
         <div>
           <div className="flex items-center justify-center">
-            <div className="flex items-center justify-center w-16 h-16 bg-green-100 rounded-full">
-              <Building className="w-8 h-8 text-green-600" />
-            </div>
+            <Logo size="2xl" variant="icon" className="bg-green-100 rounded-full" clickable={false} />
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             Pharma Registration

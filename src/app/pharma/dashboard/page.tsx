@@ -14,6 +14,7 @@ import {
   MessageCircle,
   Calendar
 } from 'lucide-react'
+import Logo from '@/components/Logo'
 
 interface Notification {
   id: string
@@ -205,8 +206,7 @@ export default function PharmaDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Building className="w-8 h-8 text-green-600 mr-3" />
-              <h1 className="text-2xl font-bold text-green-600">NotiVet</h1>
+              <Logo size="md" variant="full" />
               <span className="ml-4 text-sm text-gray-500">Pharma Dashboard</span>
             </div>
             <div className="flex items-center space-x-4">
