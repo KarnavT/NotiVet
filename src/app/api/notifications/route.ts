@@ -45,20 +45,63 @@ async function getNotifications(req: AuthenticatedRequest) {
         }
       })
     } else {
-      // For Pharma users, get their sent notifications
+      // For Pharma users, get their sent notifications with analytics
       const sentNotifications = await db.notification.findMany({
         where: {
           senderId: req.user.userId
         },
+        include: {
+          activities: true
+        },
         orderBy: { createdAt: 'desc' }
       })
 
-      notifications = sentNotifications.map(notification => ({
-        ...notification,
-        targetSpecies: notification.targetSpecies ? JSON.parse(notification.targetSpecies) : [],
-        recipientCount: 0, // Placeholder
-        activities: [] // Placeholder
-      }))
+      // Fetch associated drug information for each notification
+      const drugsMap = new Map()
+      const drugIds = sentNotifications.filter(n => n.drugId).map(n => n.drugId)
+      if (drugIds.length > 0) {
+        const drugs = await db.drug.findMany({
+          where: {
+            id: { in: drugIds }
+          }
+        })
+        drugs.forEach(drug => {
+          drugsMap.set(drug.id, drug)
+        })
+      }
+
+      // Get detailed analytics for each notification
+      notifications = await Promise.all(
+        sentNotifications.map(async (notification) => {
+          const activities = notification.activities
+          const sentCount = activities.filter(a => a.status === 'SENT').length
+          const openedCount = activities.filter(a => a.status === 'OPENED').length
+          const clickedCount = activities.filter(a => a.status === 'CLICKED').length
+          
+          // Get associated drug information
+          const drug = notification.drugId ? drugsMap.get(notification.drugId) : null
+          
+          return {
+            ...notification,
+            targetSpecies: notification.targetSpecies ? JSON.parse(notification.targetSpecies) : [],
+            recipientCount: sentCount,
+            activities: activities,
+            drug: drug ? {
+              ...drug,
+              species: drug.species ? JSON.parse(drug.species) : [],
+              deliveryMethods: drug.deliveryMethods ? JSON.parse(drug.deliveryMethods) : []
+            } : null,
+            analytics: {
+              sent: sentCount,
+              opened: openedCount,
+              clicked: clickedCount,
+              openRate: sentCount > 0 ? Math.round((openedCount / sentCount) * 10000) / 100 : 0,
+              clickRate: sentCount > 0 ? Math.round((clickedCount / sentCount) * 10000) / 100 : 0,
+              clickThroughRate: openedCount > 0 ? Math.round((clickedCount / openedCount) * 10000) / 100 : 0
+            }
+          }
+        })
+      )
     }
 
     return NextResponse.json({
@@ -146,7 +189,7 @@ async function createNotification(req: AuthenticatedRequest) {
         
         // Check if any HCP specialty matches any target species
         return hcpSpecialties.some((specialty: string) => 
-          (validatedData.targetSpecies as any[]).includes(specialty)
+          validatedData.targetSpecies.includes(specialty as any)
         )
       } catch (error) {
         console.error('Error parsing HCP specialties:', error)

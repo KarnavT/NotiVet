@@ -14,6 +14,8 @@ import {
   MessageCircle,
   Calendar
 } from 'lucide-react'
+import Logo from '@/components/Logo'
+import CampaignDetailsModal from '@/components/CampaignDetailsModal'
 
 interface Notification {
   id: string
@@ -24,6 +26,30 @@ interface Notification {
   createdAt: string
   recipientCount: number
   activities: any[]
+  drug?: {
+    id: string
+    name: string
+    genericName?: string
+    manufacturer: string
+    activeIngredient: string
+    species: string[]
+    deliveryMethods: string[]
+    description?: string
+    dosage?: string
+    contraindications?: string
+    sideEffects?: string
+    warnings?: string
+    faradInfo?: string
+    withdrawalTime?: string
+  }
+  analytics?: {
+    sent: number
+    opened: number
+    clicked: number
+    openRate: number
+    clickRate: number
+    clickThroughRate: number
+  }
 }
 
 interface Analytics {
@@ -67,6 +93,8 @@ export default function PharmaDashboard() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [selectedCampaign, setSelectedCampaign] = useState<Notification | null>(null)
+  const [showCampaignDetails, setShowCampaignDetails] = useState(false)
 
   const speciesOptions = [
     'CANINE', 'FELINE', 'EQUINE', 'BOVINE', 
@@ -186,6 +214,16 @@ export default function PharmaDashboard() {
     }))
   }
 
+  const handleViewCampaignDetails = (notification: Notification) => {
+    setSelectedCampaign(notification)
+    setShowCampaignDetails(true)
+  }
+
+  const handleCloseCampaignDetails = () => {
+    setShowCampaignDetails(false)
+    setSelectedCampaign(null)
+  }
+
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
@@ -205,8 +243,7 @@ export default function PharmaDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Building className="w-8 h-8 text-green-600 mr-3" />
-              <h1 className="text-2xl font-bold text-green-600">NotiVet</h1>
+              <Logo size="md" variant="full" />
               <span className="ml-4 text-sm text-gray-500">Pharma Dashboard</span>
             </div>
             <div className="flex items-center space-x-4">
@@ -298,7 +335,7 @@ export default function PharmaDashboard() {
             {/* New Notification Form */}
             {showNewNotification && (
               <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-                <h4 className="text-lg font-semibold mb-4">Create New Drug Campaign</h4>
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">Create New Drug Campaign</h4>
                 <p className="text-sm text-gray-600 mb-6">Send targeted notifications to veterinary professionals about your new drug while adding it to the database.</p>
                 
                 {error && (
@@ -354,7 +391,7 @@ export default function PharmaDashboard() {
                                 checked={newNotification.targetSpecies.includes(species)}
                                 onChange={() => handleSpeciesChange(species)}
                               />
-                              <span className="text-sm">{species.toLowerCase()}</span>
+                              <span className="text-sm text-gray-900">{species.toLowerCase()}</span>
                             </label>
                           ))}
                         </div>
@@ -436,7 +473,7 @@ export default function PharmaDashboard() {
                               checked={newNotification.deliveryMethods.includes(method)}
                               onChange={() => handleDeliveryMethodChange(method)}
                             />
-                            <span className="text-sm">{method.toLowerCase()}</span>
+                            <span className="text-sm text-gray-900">{method.toLowerCase()}</span>
                           </label>
                         ))}
                       </div>
@@ -590,10 +627,22 @@ export default function PharmaDashboard() {
 
                   <div className="flex justify-between items-center pt-4 border-t">
                     <div className="text-sm text-gray-700">
-                      Opens: {notification.activities.filter(a => a.status === 'OPENED').length} • 
-                      Clicks: {notification.activities.filter(a => a.status === 'CLICKED').length}
+                      {notification.analytics ? (
+                        <>
+                          Opens: {notification.analytics.opened} ({notification.analytics.openRate}%) • 
+                          Clicks: {notification.analytics.clicked} ({notification.analytics.clickRate}%)
+                        </>
+                      ) : (
+                        <>
+                          Opens: {notification.activities.filter(a => a.status === 'OPENED').length} • 
+                          Clicks: {notification.activities.filter(a => a.status === 'CLICKED').length}
+                        </>
+                      )}
                     </div>
-                    <button className="flex items-center text-green-600 hover:text-green-800">
+                    <button 
+                      onClick={() => handleViewCampaignDetails(notification)}
+                      className="flex items-center text-green-600 hover:text-green-800 transition-colors"
+                    >
                       <Eye className="w-4 h-4 mr-1" />
                       View Details
                     </button>
@@ -689,6 +738,13 @@ export default function PharmaDashboard() {
           </div>
         )}
       </div>
+      
+      {/* Campaign Details Modal */}
+      <CampaignDetailsModal
+        isOpen={showCampaignDetails}
+        onClose={handleCloseCampaignDetails}
+        campaign={selectedCampaign}
+      />
     </div>
   )
 }

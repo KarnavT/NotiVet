@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Stethoscope, ArrowRight, Eye, EyeOff, CheckCircle } from 'lucide-react'
+import Logo from '@/components/Logo'
 
 const SPECIALTY_OPTIONS = [
   { value: 'CANINE', label: 'Canine' },
@@ -116,9 +117,7 @@ export default function HCPRegister() {
       <div className="max-w-2xl w-full space-y-8">
         <div>
           <div className="flex items-center justify-center">
-            <div className="flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full">
-              <Stethoscope className="w-8 h-8 text-blue-600" />
-            </div>
+            <Logo size="2xl" variant="icon" clickable={false} />
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
             HCP Registration
