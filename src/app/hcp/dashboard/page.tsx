@@ -13,7 +13,8 @@ import {
   Eye,
   Clock,
   Building,
-  X
+  X,
+  Check
 } from 'lucide-react'
 
 interface Drug {
@@ -59,6 +60,7 @@ export default function HCPDashboard() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [removingDrug, setRemovingDrug] = useState<string | null>(null)
+  const [savedDrugIds, setSavedDrugIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const userData = localStorage.getItem('user')
@@ -108,7 +110,11 @@ export default function HCPDashboard() {
       })
       if (savedResponse.ok) {
         const savedData = await savedResponse.json()
-        setSavedDrugs(savedData.savedDrugs || [])
+        const savedDrugsList = savedData.savedDrugs || []
+        setSavedDrugs(savedDrugsList)
+        // Update the set of saved drug IDs
+        const drugIds = new Set(savedDrugsList.map((saved: any) => saved.drug.id))
+        setSavedDrugIds(drugIds)
       }
     } catch (error) {
       console.error('Error loading data:', error)
@@ -151,10 +157,20 @@ export default function HCPDashboard() {
       })
 
       if (response.ok) {
-        loadData() // Reload to update saved drugs
+        // Add to saved drugs set immediately for instant UI feedback
+        setSavedDrugIds(prev => new Set([...prev, drugId]))
+        
+        // Reload data to sync with backend
+        loadData()
       }
     } catch (error) {
       console.error('Error saving drug:', error)
+      // Remove from saved drugs set if there was an error
+      setSavedDrugIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(drugId)
+        return newSet
+      })
     }
   }
 
@@ -165,8 +181,21 @@ export default function HCPDashboard() {
     const originalSavedDrugs = savedDrugs
     
     try {
+      // Find the drug ID from the saved drug to remove from the set
+      const savedDrug = savedDrugs.find(saved => saved.id === savedDrugId)
+      const drugIdToRemove = savedDrug?.drug?.id
+      
       // Optimistically update UI by removing the drug from the list immediately
       setSavedDrugs(prevSaved => prevSaved.filter(saved => saved.id !== savedDrugId))
+      
+      // Also remove from saved drug IDs set if we found the drug ID
+      if (drugIdToRemove) {
+        setSavedDrugIds(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(drugIdToRemove)
+          return newSet
+        })
+      }
       
       const response = await fetch(`/api/drugs/saved/${savedDrugId}`, {
         method: 'DELETE',
@@ -181,6 +210,10 @@ export default function HCPDashboard() {
         // Error - revert the optimistic update
         console.error('Failed to remove drug from saved list, status:', response.status)
         setSavedDrugs(originalSavedDrugs)
+        // Also restore to saved drug IDs set
+        if (drugIdToRemove) {
+          setSavedDrugIds(prev => new Set([...prev, drugIdToRemove]))
+        }
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
         setError(errorData.error || 'Failed to remove drug')
       }
@@ -188,8 +221,12 @@ export default function HCPDashboard() {
       console.error('Error removing saved drug:', error)
       // Revert the optimistic update
       setSavedDrugs(originalSavedDrugs)
+      // Also restore to saved drug IDs set
+      if (drugIdToRemove) {
+        setSavedDrugIds(prev => new Set([...prev, drugIdToRemove]))
+      }
       setError('Network error. Please try again.')
-    } finally {
+    }
       setRemovingDrug(null)
       // Clear error after a few seconds
       setTimeout(() => setError(''), 5000)
@@ -358,11 +395,20 @@ export default function HCPDashboard() {
                       </div>
                     </div>
                     <button
-                      onClick={() => saveDrug(drug.id)}
-                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transform hover:scale-105 transition-all duration-200 shadow-md hover:shadow-lg"
+                      onClick={() => !savedDrugIds.has(drug.id) && saveDrug(drug.id)}
+                      disabled={savedDrugIds.has(drug.id)}
+                      className={`flex items-center px-4 py-2 rounded-lg transition-all duration-300 shadow-md ${
+                        savedDrugIds.has(drug.id)
+                          ? 'bg-green-600 text-white cursor-default'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-105 hover:shadow-lg'
+                      }`}
                     >
-                      <Heart className="w-4 h-4 mr-2 transition-transform duration-200 group-hover:scale-110" />
-                      Save
+                      {savedDrugIds.has(drug.id) ? (
+                        <Check className="w-4 h-4 mr-2 transition-all duration-300 scale-110" />
+                      ) : (
+                        <Heart className="w-4 h-4 mr-2 transition-all duration-300 group-hover:scale-110" />
+                      )}
+                      {savedDrugIds.has(drug.id) ? 'Saved!' : 'Save'}
                     </button>
                   </div>
                   
@@ -403,12 +449,12 @@ export default function HCPDashboard() {
                     )}
                   </div>
 
-                  {drug.description && (
+                  {(drug.usage || drug.description) && (
                     <div className="mt-4 pt-4 border-t border-gray-100">
                       <div className="mb-2">
                         <span className="text-sm font-medium text-gray-900">Description:</span>
                       </div>
-                      <p className="text-gray-700 leading-relaxed">{drug.description}</p>
+                      <p className="text-gray-700 leading-relaxed">{drug.usage || drug.description}</p>
                     </div>
                   )}
                 </div>
@@ -560,12 +606,12 @@ export default function HCPDashboard() {
                   )}
                 </div>
                 
-                {saved.drug.description && (
+                {(saved.drug.usage || saved.drug.description) && (
                   <div className="mt-4 pt-4 border-t border-gray-100">
                     <div className="mb-2">
                       <span className="text-sm font-medium text-gray-900">Description:</span>
                     </div>
-                    <p className="text-gray-700 leading-relaxed">{saved.drug.description}</p>
+                    <p className="text-gray-700 leading-relaxed">{saved.drug.usage || saved.drug.description}</p>
                   </div>
                 )}
               </div>

@@ -96,6 +96,7 @@ async function importDrugs() {
         const agents = cleanHtmlTags(record['Agent(s):'] || '')
         const tradeName = cleanHtmlTags(record['Trade Name(s):'] || '')
         const distributors = cleanHtmlTags(record['Distributor(s):'] || '')
+        const usage = cleanHtmlTags(record['Usage'] || '')
         
         // Map species to our enum format
         const mappedSpecies = mapSpecies(animalSpecies)
@@ -119,6 +120,7 @@ async function importDrugs() {
             species: JSON.stringify(mappedSpecies),
             deliveryMethods: JSON.stringify(['INJECTABLE']), // Default delivery method
             description: productTrueName !== primaryName ? productTrueName : undefined,
+            usage: usage || undefined,
             productCode: productCode,
             establishmentCode: establishmentCode,
             subsidiaries: subsidiaries !== 'Not Applicable' ? subsidiaries : undefined,
