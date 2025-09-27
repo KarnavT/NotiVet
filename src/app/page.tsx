@@ -53,7 +53,7 @@ export default function Home() {
             {/* Stats */}
             <div className="flex flex-wrap justify-center gap-12 mb-16">
               <div className="text-center">
-                <div className="text-4xl font-bold text-blue-600 mb-2">918+</div>
+                <div className="text-4xl font-bold text-blue-600 mb-2">915+</div>
                 <div className="text-sm text-gray-600 font-medium">Drug Entries</div>
               </div>
               <div className="text-center">
@@ -190,7 +190,7 @@ export default function Home() {
               </div>
               <h4 className="text-xl font-bold text-gray-900 mb-3">Comprehensive Database</h4>
               <p className="text-gray-600 leading-relaxed">
-                Search through 918+ drugs by species, symptoms, and delivery methods. Access complete dosing guidelines, 
+                Search through 915+ drugs by species, symptoms, and delivery methods. Access complete dosing guidelines, 
                 contraindications, withdrawal times, and FARAD information in one centralized location.
               </p>
             </div>

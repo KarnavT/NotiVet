@@ -1,5 +1,6 @@
 import React from 'react'
 import { Heart, Check } from 'lucide-react'
+import SpeciesIcons from './SpeciesIcons'
 
 export type DrugCardDrug = {
   id: string
@@ -66,11 +67,20 @@ export default function DrugCard({ drug, saved, onSave, context = 'database' }: 
       </div>
 
       <div className="space-y-3">
-        <div className="flex items-center">
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-700 border border-blue-200">
-            <span className="w-2 h-2 bg-blue-400 rounded-full mr-2"></span>
-            Species: {speciesText}
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center">
+            <span className="text-sm font-medium text-gray-700 mr-3">Species:</span>
+            <SpeciesIcons 
+              species={(drug as any).species || []} 
+              size="md" 
+              className="flex-wrap"
+            />
+          </div>
+          {speciesText && (
+            <span className="text-xs text-gray-500 font-medium">
+              ({speciesText})
+            </span>
+          )}
         </div>
 
         {drug.dosage && (

@@ -58,7 +58,7 @@ async function getNotifications(req: AuthenticatedRequest) {
 
       // Fetch associated drug information for each notification
       const drugsMap = new Map()
-      const drugIds = sentNotifications.filter(n => n.drugId).map(n => n.drugId)
+      const drugIds = sentNotifications.filter(n => n.drugId).map(n => n.drugId).filter((id): id is string => id !== null)
       if (drugIds.length > 0) {
         const drugs = await db.drug.findMany({
           where: {

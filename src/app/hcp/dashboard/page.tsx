@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import DrugCard from '@/components/DrugCard'
 import Logo from '@/components/Logo'
+import SpeciesIcons from '@/components/SpeciesIcons'
 
 interface Drug {
   id: string
@@ -695,8 +696,14 @@ export default function HCPDashboard() {
 
                   <div className="flex justify-between items-center pt-4 border-t border-gray-100">
                     <div className="flex items-center space-x-4">
-                      <div className="text-sm text-gray-700">
-                        <span className="font-medium">Target Species:</span> {notification.targetSpecies.join(', ')}
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-gray-700">Target Species:</span>
+                        <SpeciesIcons 
+                          species={notification.targetSpecies} 
+                          size="sm" 
+                          className="flex-wrap"
+                        />
+                        <span className="text-xs text-gray-500">({notification.targetSpecies.join(', ')})</span>
                       </div>
                     </div>
                     <div className="text-xs text-gray-500">
@@ -769,16 +776,23 @@ export default function HCPDashboard() {
                 
                 {/* Drug Details */}
                 <div className="space-y-3">
-                  <div className="flex items-center">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      <span className="w-2 h-2 bg-emerald-400 rounded-full mr-2"></span>
-                      Species: {(() => {
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium text-gray-700 mr-3">Species:</span>
+                      <SpeciesIcons 
+                        species={saved.drug.species || []} 
+                        size="md" 
+                        className="flex-wrap"
+                      />
+                    </div>
+                    <span className="text-xs text-gray-500 font-medium">
+                      ({(() => {
                         try {
                           return saved.drug.species ? JSON.parse(saved.drug.species).join(', ') : 'Not specified';
                         } catch {
                           return saved.drug.species || 'Not specified';
                         }
-                      })()}
+                      })()})
                     </span>
                   </div>
                   
