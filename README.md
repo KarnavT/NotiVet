@@ -48,6 +48,11 @@ cp .env.example .env.local
 
 Edit `.env.local` with your database connection string and secrets.
 
+Add your OpenAI API key:
+```
+OPENAI_API_KEY={OPENAI_API_KEY}
+```
+
 4. Set up the database:
 ```bash
 # Generate Prisma client
