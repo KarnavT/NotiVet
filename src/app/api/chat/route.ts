@@ -28,7 +28,7 @@ async function postChat(req: AuthenticatedRequest) {
     }
 
     // Tokenize query for broader matching (e.g., trade names, species, indications)
-    const tokens = Array.from(
+    const tokens: string[] = Array.from(
       new Set(
         query
           .toLowerCase()

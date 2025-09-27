@@ -14,7 +14,8 @@ import {
   Clock,
   Building,
   X,
-
+  MessageSquare,
+  Check,
 } from 'lucide-react'
 
 interface Drug {
