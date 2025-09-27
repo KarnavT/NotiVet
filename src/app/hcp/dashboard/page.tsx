@@ -316,11 +316,11 @@ export default function HCPDashboard() {
             {/* Search */}
             <div className="flex space-x-4">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-blue-400" />
                 <input
                   type="text"
                   placeholder="Search drugs by name, active ingredient, or manufacturer..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
+                  className="w-full pl-12 pr-4 py-3 border-2 border-blue-100 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200 text-gray-900 placeholder-gray-500 shadow-sm hover:shadow-md"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -329,7 +329,7 @@ export default function HCPDashboard() {
               <button
                 onClick={handleSearch}
                 disabled={loading}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg font-medium"
               >
                 {loading ? 'Searching...' : 'Search'}
               </button>
@@ -338,47 +338,78 @@ export default function HCPDashboard() {
             {/* Drug Results */}
             <div className="grid gap-6">
               {drugs.map((drug) => (
-                <div key={drug.id} className="bg-white rounded-lg shadow p-6">
+                <div key={drug.id} className="group bg-white rounded-xl border-2 border-blue-100 hover:border-blue-300 shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out transform hover:-translate-y-1 p-6">
                   <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900">{drug.name}</h3>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-900 transition-colors duration-200">{drug.name}</h3>
                       {drug.genericName && (
-                        <p className="text-gray-700">Generic: {drug.genericName}</p>
+                        <p className="text-gray-600 mt-1 font-medium">Generic: <span className="text-gray-700">{drug.genericName}</span></p>
                       )}
-                      <p className="text-sm text-gray-600">
-                        {drug.manufacturer} • {drug.activeIngredient}
-                      </p>
+                      <div className="flex items-center mt-2 space-x-4">
+                        <div className="flex items-center text-sm text-gray-500">
+                          <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+                          <span className="font-medium text-gray-600">Manufacturer:</span> {drug.manufacturer}
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <div className="text-sm text-gray-500">
+                          <span className="font-medium text-gray-600">Active Ingredient:</span> {drug.activeIngredient}
+                        </div>
+                      </div>
                     </div>
                     <button
                       onClick={() => saveDrug(drug.id)}
-                      className="flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"
+                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transform hover:scale-105 transition-all duration-200 shadow-md hover:shadow-lg"
                     >
-                      <Heart className="w-4 h-4 mr-1" />
+                      <Heart className="w-4 h-4 mr-2 transition-transform duration-200 group-hover:scale-110" />
                       Save
                     </button>
                   </div>
                   
-                  <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-800">
-                    <div>
-                      <strong className="text-gray-900">Species:</strong> {drug.species.join(', ')}
+                  <div className="space-y-3">
+                    <div className="flex items-center">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                        <span className="w-2 h-2 bg-blue-400 rounded-full mr-2"></span>
+                        Species: {drug.species.join(', ')}
+                      </span>
                     </div>
-                    <div>
-                      <strong className="text-gray-900">Delivery:</strong> {drug.deliveryMethods.join(', ')}
-                    </div>
+                    
                     {drug.dosage && (
-                      <div>
-                        <strong className="text-gray-900">Dosage:</strong> {drug.dosage}
+                      <div className="bg-gray-50 rounded-lg p-3 border-l-4 border-blue-400">
+                        <div className="flex items-start">
+                          <div className="flex-shrink-0">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-gray-900">Dosage</p>
+                            <p className="text-sm text-gray-700">{drug.dosage}</p>
+                          </div>
+                        </div>
                       </div>
                     )}
+                    
                     {drug.withdrawalTime && (
-                      <div>
-                        <strong className="text-gray-900">Withdrawal:</strong> {drug.withdrawalTime}
+                      <div className="bg-amber-50 rounded-lg p-3 border-l-4 border-amber-400">
+                        <div className="flex items-start">
+                          <div className="flex-shrink-0">
+                            <div className="w-2 h-2 bg-amber-500 rounded-full mt-2"></div>
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-gray-900">Withdrawal Time</p>
+                            <p className="text-sm text-gray-700">{drug.withdrawalTime}</p>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
 
                   {drug.description && (
-                    <p className="mt-4 text-gray-800">{drug.description}</p>
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <div className="mb-2">
+                        <span className="text-sm font-medium text-gray-900">Description:</span>
+                      </div>
+                      <p className="text-gray-700 leading-relaxed">{drug.description}</p>
+                    </div>
                   )}
                 </div>
               ))}
@@ -441,66 +472,101 @@ export default function HCPDashboard() {
         {activeTab === 'saved' && (
           <div className="space-y-4">
             {savedDrugs.map((saved) => (
-              <div key={saved.id} className="bg-white rounded-lg shadow p-6">
+              <div key={saved.id} className="group bg-white rounded-xl border-2 border-emerald-100 hover:border-emerald-300 shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out transform hover:-translate-y-1 p-6">
                 <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{saved.drug.name}</h3>
+                  <div className="flex-1">
+                    <div className="flex items-center mb-2">
+                      <Heart className="w-5 h-5 text-emerald-500 mr-2 fill-current" />
+                      <h3 className="text-lg font-bold text-gray-900 group-hover:text-emerald-900 transition-colors duration-200">{saved.drug.name}</h3>
+                    </div>
                     {saved.drug.genericName && (
-                      <p className="text-gray-700">Generic: {saved.drug.genericName}</p>
+                      <p className="text-gray-600 font-medium">Generic: <span className="text-gray-700">{saved.drug.genericName}</span></p>
                     )}
-                    <p className="text-sm text-gray-600">
-                      {saved.drug.manufacturer} • Saved on {new Date(saved.savedAt).toLocaleDateString()}
-                    </p>
+                    <div className="space-y-1 mt-2">
+                      <div className="flex items-center text-sm text-gray-500">
+                        <div className="w-2 h-2 bg-emerald-400 rounded-full mr-2"></div>
+                        <span className="font-medium text-gray-600">Manufacturer:</span> {saved.drug.manufacturer}
+                      </div>
+                      {saved.drug.activeIngredient && (
+                        <div className="flex items-start text-sm text-gray-500">
+                          <div className="w-2 h-2 bg-purple-400 rounded-full mr-2 mt-1.5 flex-shrink-0"></div>
+                          <div>
+                            <span className="font-medium text-gray-600">Active Ingredient:</span> {saved.drug.activeIngredient}
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-center text-sm text-gray-500">
+                        <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
+                        Saved {new Date(saved.savedAt).toLocaleDateString()}
+                      </div>
+                    </div>
                   </div>
                   <button
                     onClick={() => unsaveDrug(saved.id)}
                     disabled={removingDrug === saved.id}
-                    className={`flex items-center px-3 py-1 rounded-lg transition-colors ${
+                    className={`flex items-center px-4 py-2 rounded-lg transition-all duration-200 transform hover:scale-105 ${
                       removingDrug === saved.id 
                         ? 'bg-gray-100 text-gray-500 cursor-not-allowed' 
-                        : 'bg-red-100 text-red-700 hover:bg-red-200'
+                        : 'bg-red-600 text-white hover:bg-red-700 shadow-md hover:shadow-lg'
                     }`}
                     title="Remove from saved drugs"
                   >
-                    <X className="w-4 h-4 mr-1" />
+                    <X className="w-4 h-4 mr-2 transition-transform duration-200 hover:rotate-90" />
                     {removingDrug === saved.id ? 'Removing...' : 'Remove'}
                   </button>
                 </div>
                 
                 {/* Drug Details */}
-                <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-800 mb-4">
-                  <div>
-                    <strong className="text-gray-900">Species:</strong> {(() => {
-                      try {
-                        return saved.drug.species ? JSON.parse(saved.drug.species).join(', ') : 'Not specified';
-                      } catch {
-                        return saved.drug.species || 'Not specified';
-                      }
-                    })()}
+                <div className="space-y-3">
+                  <div className="flex items-center">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="w-2 h-2 bg-emerald-400 rounded-full mr-2"></span>
+                      Species: {(() => {
+                        try {
+                          return saved.drug.species ? JSON.parse(saved.drug.species).join(', ') : 'Not specified';
+                        } catch {
+                          return saved.drug.species || 'Not specified';
+                        }
+                      })()}
+                    </span>
                   </div>
-                  <div>
-                    <strong className="text-gray-900">Delivery:</strong> {(() => {
-                      try {
-                        return saved.drug.deliveryMethods ? JSON.parse(saved.drug.deliveryMethods).join(', ') : 'Not specified';
-                      } catch {
-                        return saved.drug.deliveryMethods || 'Not specified';
-                      }
-                    })()}
-                  </div>
+                  
                   {saved.drug.dosage && (
-                    <div>
-                      <strong className="text-gray-900">Dosage:</strong> {saved.drug.dosage}
+                    <div className="bg-gray-50 rounded-lg p-3 border-l-4 border-emerald-400">
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                          <div className="w-2 h-2 bg-emerald-500 rounded-full mt-2"></div>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-gray-900">Dosage</p>
+                          <p className="text-sm text-gray-700">{saved.drug.dosage}</p>
+                        </div>
+                      </div>
                     </div>
                   )}
+                  
                   {saved.drug.withdrawalTime && (
-                    <div>
-                      <strong className="text-gray-900">Withdrawal:</strong> {saved.drug.withdrawalTime}
+                    <div className="bg-amber-50 rounded-lg p-3 border-l-4 border-amber-400">
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                          <div className="w-2 h-2 bg-amber-500 rounded-full mt-2"></div>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-gray-900">Withdrawal Time</p>
+                          <p className="text-sm text-gray-700">{saved.drug.withdrawalTime}</p>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
                 
                 {saved.drug.description && (
-                  <p className="text-gray-800">{saved.drug.description}</p>
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <div className="mb-2">
+                      <span className="text-sm font-medium text-gray-900">Description:</span>
+                    </div>
+                    <p className="text-gray-700 leading-relaxed">{saved.drug.description}</p>
+                  </div>
                 )}
               </div>
             ))}
