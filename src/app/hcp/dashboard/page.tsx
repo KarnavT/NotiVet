@@ -88,6 +88,25 @@ export default function HCPDashboard() {
     loadData()
   }, [])
 
+  // Respect deep links like ?tab=notifications&highlight=<id>
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const tab = params.get('tab')
+      if (tab && ['drugs','chatbot','notifications','saved'].includes(tab)) {
+        setActiveTab(tab)
+      }
+      const highlight = params.get('highlight')
+      if (highlight) {
+        // Scroll into view after notifications load
+        setTimeout(() => {
+          const el = document.getElementById(`notif-${highlight}`)
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }, 600)
+      }
+    } catch {}
+  }, [])
+
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token')
     return {
@@ -590,7 +609,7 @@ export default function HCPDashboard() {
                 : 'Unknown Drug'
               
               return (
-                <div key={notification.id} className={`bg-white rounded-xl border shadow-sm hover:shadow-lg transition-all duration-300 p-6 ${
+                <div id={`notif-${notification.id}`} key={notification.id} className={`bg-white rounded-xl border shadow-sm hover:shadow-lg transition-all duration-300 p-6 ${
                   !notification.isRead 
                     ? 'border-blue-300 ring-2 ring-blue-100 bg-blue-50' 
                     : 'border-gray-200 hover:border-blue-300'
