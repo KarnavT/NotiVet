@@ -37,6 +37,7 @@ interface Drug {
 
 interface Notification {
   id: string
+  drugId?: string
   title: string
   content: string
   drugInfo?: string
@@ -47,6 +48,7 @@ interface Notification {
     contactName: string
   }
   activities: any[]
+  isRead: boolean
 }
 
 export default function HCPDashboard() {
@@ -67,6 +69,7 @@ export default function HCPDashboard() {
   const [error, setError] = useState('')
   const [removingDrug, setRemovingDrug] = useState<string | null>(null)
   const [savedDrugIds, setSavedDrugIds] = useState<Set<string>>(new Set())
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
 
   useEffect(() => {
     const userData = localStorage.getItem('user')
@@ -121,6 +124,15 @@ export default function HCPDashboard() {
         // Update the set of saved drug IDs
         const drugIds = new Set<string>(savedDrugsList.map((saved: any) => saved.drug.id as string))
         setSavedDrugIds(drugIds)
+      }
+
+      // Load unread notification count
+      const countResponse = await fetch('/api/notifications/count', {
+        headers: getAuthHeaders()
+      })
+      if (countResponse.ok) {
+        const countData = await countResponse.json()
+        setUnreadNotificationCount(countData.unread || 0)
       }
     } catch (error) {
       console.error('Error loading data:', error)
@@ -178,6 +190,55 @@ export default function HCPDashboard() {
       setChatbotError('Network error while contacting chatbot')
     } finally {
       setChatbotLoading(false)
+    }
+  }
+
+  const trackNotification = async (notificationId: string, action: string) => {
+    try {
+      await fetch(`/api/notifications/${notificationId}/track`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ action })
+      })
+      
+      // If marking as opened, update the unread count
+      if (action === 'OPENED' && unreadNotificationCount > 0) {
+        setUnreadNotificationCount(prev => Math.max(0, prev - 1))
+      }
+    } catch (error) {
+      console.error('Failed to track notification:', error)
+    }
+  }
+
+  const markAsUnread = async (notificationId: string) => {
+    try {
+      // We'll create a new API endpoint to handle marking as unread
+      await fetch(`/api/notifications/${notificationId}/unread`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      })
+      
+      // Update local state to mark as unread
+      setNotifications(prev => prev.map(n => 
+        n.id === notificationId ? { ...n, isRead: false } : n
+      ))
+      
+      // Increment unread count
+      setUnreadNotificationCount(prev => prev + 1)
+    } catch (error) {
+      console.error('Failed to mark as unread:', error)
+    }
+  }
+
+  const saveDrugFromNotification = async (drugId: string, notificationId: string) => {
+    try {
+      // Track the click action first
+      await trackNotification(notificationId, 'CLICKED')
+      
+      // Then save the drug using the existing saveDrug logic
+      await saveDrug(drugId)
+    } catch (error) {
+      console.error('Failed to save drug from notification:', error)
     }
   }
 
@@ -279,17 +340,6 @@ export default function HCPDashboard() {
     }
   }
 
-  const trackNotification = async (notificationId: string, action: 'opened' | 'clicked') => {
-    try {
-      await fetch(`/api/notifications/${notificationId}/track`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ action })
-      })
-    } catch (error) {
-      console.error('Error tracking notification:', error)
-    }
-  }
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -348,7 +398,7 @@ export default function HCPDashboard() {
           </p>
           <div className="mt-4 flex space-x-4 text-sm">
             <div className="bg-white rounded-lg p-3">
-              <div className="font-semibold text-blue-600">{notifications.length}</div>
+              <div className="font-semibold text-blue-600">{unreadNotificationCount}</div>
               <div className="text-gray-500">New Notifications</div>
             </div>
             <div className="bg-white rounded-lg p-3">
@@ -368,13 +418,13 @@ export default function HCPDashboard() {
             {[
               { id: 'drugs', name: 'Drug Database', icon: BookOpen },
               { id: 'chatbot', name: 'Chatbot', icon: MessageSquare },
-              { id: 'notifications', name: 'Notifications', icon: Bell },
+              { id: 'notifications', name: 'Notifications', icon: Bell, count: unreadNotificationCount },
               { id: 'saved', name: 'Saved Drugs', icon: Heart }
-            ].map(({ id, name, icon: Icon }) => (
+            ].map(({ id, name, icon: Icon, count }) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
-                className={`group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm relative ${
                   activeTab === id
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -382,6 +432,11 @@ export default function HCPDashboard() {
               >
                 <Icon className="w-4 h-4 mr-2" />
                 {name}
+                {id === 'notifications' && count > 0 && (
+                  <span className="ml-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                    {count}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
@@ -557,49 +612,146 @@ export default function HCPDashboard() {
         {/* Notifications Tab */}
         {activeTab === 'notifications' && (
           <div className="space-y-4">
-            {notifications.map((notification) => (
-              <div key={notification.id} className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900">{notification.title}</h3>
-                    <div className="flex items-center text-sm text-gray-600 mt-1">
-                      <Building className="w-4 h-4 mr-1" />
-                      {notification.sender.companyName} • {notification.sender.contactName}
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Drug Notifications</h3>
+              <div className="text-sm text-gray-600">
+                {unreadNotificationCount > 0 ? (
+                  <span className="text-blue-600 font-medium">
+                    {unreadNotificationCount} unread
+                  </span>
+                ) : (
+                  <span>All caught up!</span>
+                )}
+                <span className="mx-2">•</span>
+                {notifications.length} total
+              </div>
+            </div>
+            
+            {notifications.map((notification) => {
+              const drugName = notification.drugInfo?.includes('New Drug:') 
+                ? notification.drugInfo.split('New Drug: ')[1]?.split(' -')[0] 
+                : 'Unknown Drug'
+              
+              return (
+                <div key={notification.id} className={`bg-white rounded-xl border shadow-sm hover:shadow-lg transition-all duration-300 p-6 ${
+                  !notification.isRead 
+                    ? 'border-blue-300 ring-2 ring-blue-100 bg-blue-50' 
+                    : 'border-gray-200 hover:border-blue-300'
+                }`}>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex-1">
+                      <div className="flex items-center mb-2">
+                        {!notification.isRead ? (
+                          <div className="w-3 h-3 bg-blue-500 rounded-full mr-3 animate-pulse" title="Unread notification"></div>
+                        ) : (
+                          <div className="w-3 h-3 bg-gray-300 rounded-full mr-3" title="Read notification"></div>
+                        )}
+                        <h3 className={`text-lg font-semibold ${!notification.isRead ? 'text-blue-900' : 'text-gray-900'}`}>
+                          {notification.title}
+                        </h3>
+                        {!notification.isRead && (
+                          <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            NEW
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center text-sm text-gray-600 mb-2">
+                        <Building className="w-4 h-4 mr-1" />
+                        {notification.sender.companyName} • {notification.sender.contactName}
+                      </div>
+                      <div className="flex items-center text-sm text-gray-500">
+                        <Clock className="w-4 h-4 mr-1" />
+                        {new Date(notification.createdAt).toLocaleDateString()} at {new Date(notification.createdAt).toLocaleTimeString()}
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      {notification.drugId && (
+                        <button
+                          onClick={() => !savedDrugIds.has(notification.drugId!) && saveDrugFromNotification(notification.drugId!, notification.id)}
+                          disabled={savedDrugIds.has(notification.drugId!)}
+                          className={`flex items-center px-4 py-2 rounded-lg transition-all duration-300 shadow-md ${
+                            savedDrugIds.has(notification.drugId!)
+                              ? 'bg-green-600 text-white cursor-default'
+                              : 'bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-105 hover:shadow-lg'
+                          }`}
+                        >
+                          {savedDrugIds.has(notification.drugId!) ? (
+                            <Check className="w-4 h-4 mr-2 transition-all duration-300 scale-110" />
+                          ) : (
+                            <Heart className="w-4 h-4 mr-2 transition-all duration-300 group-hover:scale-110" />
+                          )}
+                          {savedDrugIds.has(notification.drugId!) ? 'Saved!' : 'Save'}
+                        </button>
+                      )}
+                      {!notification.isRead ? (
+                        <button
+                          onClick={() => {
+                            trackNotification(notification.id, 'OPENED')
+                            // Update local state to mark as read
+                            setNotifications(prev => prev.map(n => 
+                              n.id === notification.id ? { ...n, isRead: true } : n
+                            ))
+                          }}
+                          className="flex items-center px-3 py-2 text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          Mark Read
+                        </button>
+                      ) : (
+                        <>
+                          <div className="flex items-center px-3 py-2 text-gray-500 text-sm">
+                            <Check className="w-4 h-4 mr-1" />
+                            Read
+                          </div>
+                          <button
+                            onClick={() => markAsUnread(notification.id)}
+                            className="flex items-center px-3 py-2 text-gray-600 border border-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                          >
+                            <Bell className="w-4 h-4 mr-1" />
+                            Mark Unread
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Clock className="w-4 h-4 mr-1" />
-                    {new Date(notification.createdAt).toLocaleDateString()}
+                  
+                  <div className="bg-blue-50 rounded-lg p-4 mb-4">
+                    <p className="text-gray-800 leading-relaxed">{notification.content}</p>
                   </div>
-                </div>
-                
-                <p className="text-gray-800 mb-4">{notification.content}</p>
-                
-                {notification.drugInfo && (
-                  <div className="bg-blue-50 rounded-lg p-3 mb-4">
-                    <strong className="text-blue-900">Drug Information:</strong>
-                    <p className="text-blue-800 mt-1">{notification.drugInfo}</p>
-                  </div>
-                )}
+                  
+                  {notification.drugInfo && (
+                    <div className="bg-green-50 rounded-lg p-4 mb-4 border-l-4 border-green-400">
+                      <div className="flex items-start">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
+                        <div>
+                          <strong className="text-green-900 block mb-1">New Drug Information:</strong>
+                          <p className="text-green-800">{notification.drugInfo}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-                <div className="flex justify-between items-center">
-                  <div className="text-sm text-gray-700">
-                    Target Species: {notification.targetSpecies.join(', ')}
+                  <div className="flex justify-between items-center pt-4 border-t border-gray-100">
+                    <div className="flex items-center space-x-4">
+                      <div className="text-sm text-gray-700">
+                        <span className="font-medium">Target Species:</span> {notification.targetSpecies.join(', ')}
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Click notifications to track engagement
+                    </div>
                   </div>
-                  <button
-                    onClick={() => trackNotification(notification.id, 'clicked')}
-                    className="flex items-center text-blue-600 hover:text-blue-800"
-                  >
-                    <Eye className="w-4 h-4 mr-1" />
-                    Mark as Read
-                  </button>
                 </div>
-              </div>
-            ))}
+              )
+            })}
             
             {notifications.length === 0 && (
-              <div className="text-center py-8 text-gray-600">
-                No notifications yet. Check back later for updates from pharmaceutical companies.
+              <div className="text-center py-12">
+                <Bell className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No notifications yet</h3>
+                <p className="text-gray-600">
+                  When pharmaceutical companies announce new drugs relevant to your specialties, you'll see them here.
+                </p>
               </div>
             )}
           </div>

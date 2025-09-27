@@ -7,10 +7,43 @@ async function getNotifications(req: AuthenticatedRequest) {
   try {
     let notifications: any[] = []
 
-    // For HCP users, get their received notifications (but there won't be any initially)
+    // For HCP users, get their received notifications based on notification activities
     if (req.user.userType === 'HCP') {
-      // For now, return empty array since we don't have a many-to-many relationship set up properly for SQLite
-      notifications = []
+      const receivedNotifications = await db.notification.findMany({
+        where: {
+          activities: {
+            some: {
+              userId: req.user.userId
+            }
+          }
+        },
+        include: {
+          sender: {
+            include: {
+              pharmaProfile: true
+            }
+          },
+          activities: {
+            where: {
+              userId: req.user.userId
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      })
+
+      notifications = receivedNotifications.map(notification => {
+        const isRead = notification.activities.some(activity => activity.status === 'OPENED')
+        return {
+          ...notification,
+          targetSpecies: notification.targetSpecies ? JSON.parse(notification.targetSpecies) : [],
+          sender: {
+            companyName: notification.sender.pharmaProfile?.companyName || 'Unknown Company',
+            contactName: notification.sender.pharmaProfile?.contactName || 'Unknown Contact'
+          },
+          isRead
+        }
+      })
     } else {
       // For Pharma users, get their sent notifications
       const sentNotifications = await db.notification.findMany({
@@ -52,33 +85,72 @@ async function createNotification(req: AuthenticatedRequest) {
         { status: 403 }
       )
     }
+
+    // Get pharma company information for the drug manufacturer
+    const pharmaProfile = await db.pharmaProfile.findUnique({
+      where: { userId: req.user.userId }
+    })
     
-    // Create the notification
+    // Create the new drug first
+    const newDrug = await db.drug.create({
+      data: {
+        name: validatedData.drugName,
+        genericName: validatedData.genericName || null,
+        manufacturer: pharmaProfile?.companyName || validatedData.manufacturer,
+        activeIngredient: validatedData.activeIngredient,
+        species: JSON.stringify(validatedData.targetSpecies),
+        deliveryMethods: JSON.stringify(validatedData.deliveryMethods),
+        description: validatedData.description || null,
+        dosage: validatedData.dosage || null,
+        contraindications: validatedData.contraindications || null,
+        sideEffects: validatedData.sideEffects || null,
+        warnings: validatedData.warnings || null,
+        faradInfo: validatedData.faradInfo || null,
+        withdrawalTime: validatedData.withdrawalTime || null
+      }
+    })
+    
+    // Create the notification with reference to the new drug
     const notification = await db.notification.create({
       data: {
         senderId: req.user.userId,
+        drugId: newDrug.id,
         title: validatedData.title,
         content: validatedData.content,
-        drugInfo: validatedData.drugInfo || null,
+        drugInfo: `New Drug: ${validatedData.drugName}` + (validatedData.drugInfo ? ` - ${validatedData.drugInfo}` : ''),
         targetSpecies: JSON.stringify(validatedData.targetSpecies)
       }
     })
     
-    // Find HCPs that match the target species
-    // This is a simplified approach - in a real application, you might want more sophisticated targeting
-    const targetHCPs = await db.user.findMany({
+    // Find HCPs that match the target species - improved logic for better matching
+    const allHCPs = await db.user.findMany({
       where: {
         userType: 'HCP',
         hcpProfile: {
           specialties: {
-            // Check if any of the HCP's specialties overlap with target species
-            // This is a simple string contains check - could be improved with proper JSON querying
-            contains: validatedData.targetSpecies[0] // Simplified for SQLite compatibility
+            not: null
           }
         }
       },
       include: {
         hcpProfile: true
+      }
+    })
+
+    // Filter HCPs whose specialties overlap with target species
+    const targetHCPs = allHCPs.filter(hcp => {
+      try {
+        const hcpSpecialties = hcp.hcpProfile?.specialties 
+          ? JSON.parse(hcp.hcpProfile.specialties)
+          : []
+        
+        // Check if any HCP specialty matches any target species
+        return hcpSpecialties.some((specialty: string) => 
+          validatedData.targetSpecies.includes(specialty)
+        )
+      } catch (error) {
+        console.error('Error parsing HCP specialties:', error)
+        return false
       }
     })
     
@@ -93,15 +165,20 @@ async function createNotification(req: AuthenticatedRequest) {
       await db.notificationActivity.createMany({
         data: activities
       })
+
+      // Send email notifications to HCPs
+      await sendEmailNotifications(targetHCPs, notification, newDrug, pharmaProfile)
     }
     
     return NextResponse.json({
-      message: 'Notification sent successfully',
+      message: `Drug created successfully! Campaign sent to ${targetHCPs.length} veterinary professionals.`,
       notification: {
         ...notification,
         targetSpecies: JSON.parse(notification.targetSpecies || '[]'),
         recipientCount: targetHCPs.length,
-        activities: []
+        activities: [],
+        drugId: newDrug.id,
+        drugName: newDrug.name
       }
     })
     
@@ -119,6 +196,70 @@ async function createNotification(req: AuthenticatedRequest) {
       { error: 'Internal server error' },
       { status: 500 }
     )
+  }
+}
+
+// Email notification function
+async function sendEmailNotifications(targetHCPs: any[], notification: any, drug: any, pharmaProfile: any) {
+  // Only send emails if nodemailer is configured
+  try {
+    const nodemailer = require('nodemailer')
+    
+    // Configure transporter (using console for demo - in production you'd use a real SMTP service)
+    const transporter = nodemailer.createTransporter({
+      // For demo purposes, we'll just log the emails
+      // In production, configure with real SMTP settings
+      streamTransport: true,
+      newline: 'unix',
+      buffer: true
+    })
+
+    const dashboardUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://your-domain.com' 
+      : 'http://localhost:3000'
+
+    for (const hcp of targetHCPs) {
+      const emailContent = `
+        Dear Dr. ${hcp.hcpProfile.firstName} ${hcp.hcpProfile.lastName},
+
+        ${pharmaProfile?.companyName || 'A pharmaceutical company'} has announced a new drug that may be relevant to your practice:
+
+        **${drug.name}** ${drug.genericName ? `(${drug.genericName})` : ''}
+        Active Ingredient: ${drug.activeIngredient}
+        Target Species: ${JSON.parse(drug.species).join(', ')}
+        Delivery Methods: ${JSON.parse(drug.deliveryMethods).join(', ')}
+
+        ${notification.content}
+
+        ${drug.description ? `\nDescription: ${drug.description}` : ''}
+        ${drug.dosage ? `\nDosage: ${drug.dosage}` : ''}
+        ${drug.warnings ? `\nWarnings: ${drug.warnings}` : ''}
+
+        View this drug and add it to your formulary by clicking here:
+        ${dashboardUrl}/hcp/dashboard?tab=notifications&highlight=${notification.id}
+
+        Best regards,
+        The NotiVet Team
+      `
+
+      const mailOptions = {
+        from: 'notifications@notivet.com',
+        to: hcp.email,
+        subject: `New Drug Alert: ${drug.name} - ${notification.title}`,
+        text: emailContent
+      }
+
+      // For demo, just log the email
+      console.log('📧 Email would be sent to:', hcp.email)
+      console.log('Subject:', mailOptions.subject)
+      console.log('Content preview:', emailContent.substring(0, 200) + '...')
+      
+      // In production, you would uncomment this line:
+      // await transporter.sendMail(mailOptions)
+    }
+  } catch (error) {
+    console.error('Email sending error:', error)
+    // Don't fail the whole request if email fails
   }
 }
 

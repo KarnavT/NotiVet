@@ -68,6 +68,19 @@ export const notificationSchema = z.object({
   content: z.string().min(1, 'Content is required'),
   drugInfo: z.string().optional(),
   targetSpecies: z.array(z.enum(['CANINE', 'FELINE', 'EQUINE', 'BOVINE', 'OVINE', 'CAPRINE', 'PORCINE', 'AVIAN', 'EXOTIC'])).min(1, 'At least one target species is required'),
+  // Drug creation fields
+  drugName: z.string().min(1, 'Drug name is required'),
+  genericName: z.string().optional(),
+  manufacturer: z.string().min(1, 'Manufacturer is required'),
+  activeIngredient: z.string().min(1, 'Active ingredient is required'),
+  deliveryMethods: z.array(z.enum(['ORAL', 'INJECTABLE', 'TOPICAL', 'INHALATION', 'IMPLANT', 'TRANSDERMAL'])).min(1, 'At least one delivery method is required'),
+  description: z.string().optional(),
+  dosage: z.string().optional(),
+  contraindications: z.string().optional(),
+  sideEffects: z.string().optional(),
+  warnings: z.string().optional(),
+  faradInfo: z.string().optional(),
+  withdrawalTime: z.string().optional(),
 })
 
 // Profile update schemas

@@ -50,7 +50,20 @@ export default function PharmaDashboard() {
     title: '',
     content: '',
     drugInfo: '',
-    targetSpecies: [] as string[]
+    targetSpecies: [] as string[],
+    // Drug creation fields
+    drugName: '',
+    genericName: '',
+    manufacturer: '',
+    activeIngredient: '',
+    deliveryMethods: [] as string[],
+    description: '',
+    dosage: '',
+    contraindications: '',
+    sideEffects: '',
+    warnings: '',
+    faradInfo: '',
+    withdrawalTime: ''
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -58,6 +71,10 @@ export default function PharmaDashboard() {
   const speciesOptions = [
     'CANINE', 'FELINE', 'EQUINE', 'BOVINE', 
     'OVINE', 'CAPRINE', 'PORCINE', 'AVIAN', 'EXOTIC'
+  ]
+
+  const deliveryMethodOptions = [
+    'ORAL', 'INJECTABLE', 'TOPICAL', 'INHALATION', 'IMPLANT', 'TRANSDERMAL'
   ]
 
   useEffect(() => {
@@ -125,7 +142,20 @@ export default function PharmaDashboard() {
           title: '',
           content: '',
           drugInfo: '',
-          targetSpecies: []
+          targetSpecies: [],
+          // Drug creation fields
+          drugName: '',
+          genericName: '',
+          manufacturer: '',
+          activeIngredient: '',
+          deliveryMethods: [],
+          description: '',
+          dosage: '',
+          contraindications: '',
+          sideEffects: '',
+          warnings: '',
+          faradInfo: '',
+          withdrawalTime: ''
         })
         loadData() // Reload data
       } else {
@@ -144,6 +174,15 @@ export default function PharmaDashboard() {
       targetSpecies: prev.targetSpecies.includes(species)
         ? prev.targetSpecies.filter(s => s !== species)
         : [...prev.targetSpecies, species]
+    }))
+  }
+
+  const handleDeliveryMethodChange = (method: string) => {
+    setNewNotification(prev => ({
+      ...prev,
+      deliveryMethods: prev.deliveryMethods.includes(method)
+        ? prev.deliveryMethods.filter(m => m !== method)
+        : [...prev.deliveryMethods, method]
     }))
   }
 
@@ -259,7 +298,8 @@ export default function PharmaDashboard() {
             {/* New Notification Form */}
             {showNewNotification && (
               <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-                <h4 className="text-lg font-semibold mb-4">Create New Notification Campaign</h4>
+                <h4 className="text-lg font-semibold mb-4">Create New Drug Campaign</h4>
+                <p className="text-sm text-gray-600 mb-6">Send targeted notifications to veterinary professionals about your new drug while adding it to the database.</p>
                 
                 {error && (
                   <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
@@ -267,74 +307,242 @@ export default function PharmaDashboard() {
                   </div>
                 )}
 
-                <form onSubmit={handleSendNotification} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Campaign Title
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                      value={newNotification.title}
-                      onChange={(e) => setNewNotification({...newNotification, title: e.target.value})}
-                      placeholder="e.g., New Pain Management Solution for Canines"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Message Content
-                    </label>
-                    <textarea
-                      required
-                      rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                      value={newNotification.content}
-                      onChange={(e) => setNewNotification({...newNotification, content: e.target.value})}
-                      placeholder="Write your message to veterinary professionals..."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Drug Information (Optional)
-                    </label>
-                    <textarea
-                      rows={2}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
-                      value={newNotification.drugInfo}
-                      onChange={(e) => setNewNotification({...newNotification, drugInfo: e.target.value})}
-                      placeholder="Additional drug details, dosage information, etc."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Target Species (Select at least one)
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {speciesOptions.map(species => (
-                        <label key={species} className="flex items-center">
-                          <input
-                            type="checkbox"
-                            className="mr-2 text-green-600 focus:ring-green-500"
-                            checked={newNotification.targetSpecies.includes(species)}
-                            onChange={() => handleSpeciesChange(species)}
-                          />
-                          <span className="text-sm">{species.toLowerCase()}</span>
+                <form onSubmit={handleSendNotification} className="space-y-6">
+                  {/* Campaign Information */}
+                  <div className="border-b border-gray-200 pb-6">
+                    <h5 className="text-md font-medium text-gray-900 mb-4">Campaign Information</h5>
+                    
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-1">
+                          Campaign Title *
                         </label>
-                      ))}
+                        <input
+                          type="text"
+                          required
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-gray-900"
+                          value={newNotification.title}
+                          onChange={(e) => setNewNotification({...newNotification, title: e.target.value})}
+                          placeholder="e.g., Introducing Rimadyl - Advanced Pain Management for Canines"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-1">
+                          Message Content *
+                        </label>
+                        <textarea
+                          required
+                          rows={4}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-gray-900"
+                          value={newNotification.content}
+                          onChange={(e) => setNewNotification({...newNotification, content: e.target.value})}
+                          placeholder="Write your message to veterinary professionals about this new drug..."
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-2">
+                          Target Species (Select at least one) *
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {speciesOptions.map(species => (
+                            <label key={species} className="flex items-center">
+                              <input
+                                type="checkbox"
+                                className="mr-2 text-green-600 focus:ring-green-500"
+                                checked={newNotification.targetSpecies.includes(species)}
+                                onChange={() => handleSpeciesChange(species)}
+                              />
+                              <span className="text-sm">{species.toLowerCase()}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex space-x-4">
+                  {/* Drug Information */}
+                  <div>
+                    <h5 className="text-md font-medium text-gray-900 mb-4">New Drug Information</h5>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-1">
+                          Drug Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-gray-900"
+                          value={newNotification.drugName}
+                          onChange={(e) => setNewNotification({...newNotification, drugName: e.target.value})}
+                          placeholder="e.g., Rimadyl"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-1">
+                          Generic Name
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-gray-900"
+                          value={newNotification.genericName}
+                          onChange={(e) => setNewNotification({...newNotification, genericName: e.target.value})}
+                          placeholder="e.g., Carprofen"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-1">
+                          Manufacturer *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-gray-900"
+                          value={newNotification.manufacturer}
+                          onChange={(e) => setNewNotification({...newNotification, manufacturer: e.target.value})}
+                          placeholder="e.g., Zoetis"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-1">
+                          Active Ingredient *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-gray-900"
+                          value={newNotification.activeIngredient}
+                          onChange={(e) => setNewNotification({...newNotification, activeIngredient: e.target.value})}
+                          placeholder="e.g., Carprofen"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-900 mb-2">
+                        Delivery Methods (Select at least one) *
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {deliveryMethodOptions.map(method => (
+                          <label key={method} className="flex items-center">
+                            <input
+                              type="checkbox"
+                              className="mr-2 text-green-600 focus:ring-green-500"
+                              checked={newNotification.deliveryMethods.includes(method)}
+                              onChange={() => handleDeliveryMethodChange(method)}
+                            />
+                            <span className="text-sm">{method.toLowerCase()}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-1">
+                          Description
+                        </label>
+                        <textarea
+                          rows={3}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-gray-900"
+                          value={newNotification.description}
+                          onChange={(e) => setNewNotification({...newNotification, description: e.target.value})}
+                          placeholder="Brief description of the drug and its uses..."
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-1">
+                          Dosage Information
+                        </label>
+                        <textarea
+                          rows={3}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-gray-900"
+                          value={newNotification.dosage}
+                          onChange={(e) => setNewNotification({...newNotification, dosage: e.target.value})}
+                          placeholder="e.g., 2 mg/lb (4.4 mg/kg) twice daily"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-1">
+                          Contraindications
+                        </label>
+                        <textarea
+                          rows={2}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-gray-900"
+                          value={newNotification.contraindications}
+                          onChange={(e) => setNewNotification({...newNotification, contraindications: e.target.value})}
+                          placeholder="When not to use this drug..."
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-1">
+                          Side Effects
+                        </label>
+                        <textarea
+                          rows={2}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-gray-900"
+                          value={newNotification.sideEffects}
+                          onChange={(e) => setNewNotification({...newNotification, sideEffects: e.target.value})}
+                          placeholder="Potential side effects..."
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-1">
+                          Warnings
+                        </label>
+                        <textarea
+                          rows={2}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-gray-900"
+                          value={newNotification.warnings}
+                          onChange={(e) => setNewNotification({...newNotification, warnings: e.target.value})}
+                          placeholder="Important warnings and precautions..."
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-900 mb-1">
+                          Withdrawal Time
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-gray-900"
+                          value={newNotification.withdrawalTime}
+                          onChange={(e) => setNewNotification({...newNotification, withdrawalTime: e.target.value})}
+                          placeholder="e.g., Cattle: 4 days milk, 12 hours meat"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-900 mb-1">
+                        FARAD Information
+                      </label>
+                      <textarea
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-gray-900"
+                        value={newNotification.faradInfo}
+                        onChange={(e) => setNewNotification({...newNotification, faradInfo: e.target.value})}
+                        placeholder="FARAD compliance information..."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-4 pt-6 border-t border-gray-200">
                     <button
                       type="submit"
-                      disabled={loading || newNotification.targetSpecies.length === 0}
+                      disabled={loading || newNotification.targetSpecies.length === 0 || newNotification.deliveryMethods.length === 0 || !newNotification.drugName || !newNotification.manufacturer || !newNotification.activeIngredient}
                       className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50"
                     >
-                      {loading ? 'Sending...' : 'Send Campaign'}
+                      {loading ? 'Creating Drug & Sending Campaign...' : 'Create Drug & Send Campaign'}
                     </button>
                     <button
                       type="button"
