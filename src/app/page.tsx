@@ -11,14 +11,7 @@ export default function Home() {
             <div className="flex items-center">
               <h1 className="text-2xl font-bold text-blue-600">NotiVet</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <Link href="/hcp/login" className="text-gray-700 hover:text-blue-600">
-                HCP Login
-              </Link>
-              <Link href="/pharma/login" className="text-gray-700 hover:text-green-600">
-                Pharma Login
-              </Link>
-            </div>
+            
           </div>
         </div>
       </nav>
