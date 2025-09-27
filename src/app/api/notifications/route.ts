@@ -180,6 +180,11 @@ async function createNotification(req: AuthenticatedRequest) {
       }
     })
 
+    // Compute dashboard base URL from the incoming request (works with ngrok/CF tunnels)
+    const proto = req.headers.get('x-forwarded-proto') || 'http'
+    const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:3000'
+    const dashboardBaseUrl = `${proto}://${host}`
+
     // Filter HCPs whose specialties overlap with target species
     const targetHCPs = allHCPs.filter(hcp => {
       try {
@@ -210,7 +215,7 @@ async function createNotification(req: AuthenticatedRequest) {
       })
 
       // Send email notifications to HCPs
-      await sendEmailNotifications(targetHCPs, notification, newDrug, pharmaProfile)
+      await sendEmailNotifications(targetHCPs, notification, newDrug, pharmaProfile, dashboardBaseUrl)
     }
     
     return NextResponse.json({
@@ -243,23 +248,28 @@ async function createNotification(req: AuthenticatedRequest) {
 }
 
 // Email notification function
-async function sendEmailNotifications(targetHCPs: any[], notification: any, drug: any, pharmaProfile: any) {
+async function sendEmailNotifications(targetHCPs: any[], notification: any, drug: any, pharmaProfile: any, dashboardUrl: string) {
   // Only send emails if nodemailer is configured
   try {
     const nodemailer = require('nodemailer')
-    
-    // Configure transporter (using console for demo - in production you'd use a real SMTP service)
-    const transporter = nodemailer.createTransporter({
-      // For demo purposes, we'll just log the emails
-      // In production, configure with real SMTP settings
-      streamTransport: true,
-      newline: 'unix',
-      buffer: true
-    })
 
-    const dashboardUrl = process.env.NODE_ENV === 'production' 
-      ? 'https://your-domain.com' 
-      : 'http://localhost:3000'
+    // Configure transporter: prefer real SMTP if env vars present; otherwise fallback to stream logger
+    const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE } = process.env as Record<string, string | undefined>
+    const useSmtp = !!SMTP_HOST && !!SMTP_PORT
+
+    const transporter = useSmtp
+      ? nodemailer.createTransport({
+          host: SMTP_HOST,
+          port: Number(SMTP_PORT),
+          secure: SMTP_SECURE === 'true' || Number(SMTP_PORT) === 465,
+          auth: SMTP_USER && SMTP_PASS ? { user: SMTP_USER, pass: SMTP_PASS } : undefined,
+        })
+      : nodemailer.createTransport({
+          // Fallback: log-only transport (safe for local dev/demo)
+          streamTransport: true,
+          newline: 'unix',
+          buffer: true,
+        })
 
     for (const hcp of targetHCPs) {
       const emailContent = `
@@ -285,20 +295,22 @@ async function sendEmailNotifications(targetHCPs: any[], notification: any, drug
         The NotiVet Team
       `
 
+      const toOverride = process.env.EMAIL_TEST_RECIPIENT
+      const fromAddress = process.env.SMTP_FROM || 'notifications@notivet.com'
       const mailOptions = {
-        from: 'notifications@notivet.com',
-        to: hcp.email,
+        from: fromAddress,
+        to: toOverride || hcp.email,
         subject: `New Drug Alert: ${drug.name} - ${notification.title}`,
         text: emailContent
       }
 
-      // For demo, just log the email
-      console.log('📧 Email would be sent to:', hcp.email)
+      // Send the email (if stream transport is configured, it will log instead)
+      await transporter.sendMail(mailOptions)
+
+      // Log for visibility during demo
+      console.log('📧 Email sent to:', mailOptions.to)
       console.log('Subject:', mailOptions.subject)
       console.log('Content preview:', emailContent.substring(0, 200) + '...')
-      
-      // In production, you would uncomment this line:
-      // await transporter.sendMail(mailOptions)
     }
   } catch (error) {
     console.error('Email sending error:', error)
