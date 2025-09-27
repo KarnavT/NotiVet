@@ -441,7 +441,7 @@ export default function HCPDashboard() {
               { id: 'chatbot', name: 'Chatbot', icon: MessageSquare },
               { id: 'notifications', name: 'Notifications', icon: Bell, count: unreadNotificationCount },
               { id: 'saved', name: 'Saved Drugs', icon: Heart }
-            ].map(({ id, name, icon: Icon, count }) => (
+            ].map(({ id, name, icon: Icon, count = 0 }) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
