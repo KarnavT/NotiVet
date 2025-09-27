@@ -1,228 +1,201 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { 
-  Bell, 
-  Heart, 
   Search, 
-  Filter, 
-  ExternalLink, 
-  FileText, 
-  Star,
+  Stethoscope, 
+  Bell, 
+  BookOpen, 
+  LogOut,
+  Filter,
+  Heart,
   Eye,
-  EyeOff,
-  ChevronDown,
-  User,
-  Settings,
-  LogOut
-} from 'lucide-react';
-import { mockMessages, mockDrugs, Drug, Message } from '@/data/mockData';
+  Clock,
+  Building
+} from 'lucide-react'
+
+interface Drug {
+  id: string
+  name: string
+  genericName?: string
+  manufacturer: string
+  activeIngredient: string
+  species: string[]
+  deliveryMethods: string[]
+  description?: string
+  dosage?: string
+  contraindications?: string
+  sideEffects?: string
+  warnings?: string
+  faradInfo?: string
+  withdrawalTime?: string
+}
+
+interface Notification {
+  id: string
+  title: string
+  content: string
+  drugInfo?: string
+  targetSpecies: string[]
+  createdAt: string
+  sender: {
+    companyName: string
+    contactName: string
+  }
+  activities: any[]
+}
 
 export default function HCPDashboard() {
-  const [activeTab, setActiveTab] = useState('messages');
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
-  const [favoriteDrugs, setFavoriteDrugs] = useState<Drug[]>(
-    mockDrugs.filter(drug => ['1', '4'].includes(drug.id)).map(drug => ({ ...drug, isFavorite: true }))
-  );
-  const [newProducts] = useState<Drug[]>(mockDrugs.slice(0, 3));
+  const router = useRouter()
+  const [user, setUser] = useState<any>(null)
+  const [activeTab, setActiveTab] = useState('drugs')
+  const [drugs, setDrugs] = useState<Drug[]>([])
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [savedDrugs, setSavedDrugs] = useState<any[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const markAsRead = (messageId: string) => {
-    setMessages(prev => 
-      prev.map(msg => 
-        msg.id === messageId ? { ...msg, isRead: true } : msg
-      )
-    );
-  };
+  useEffect(() => {
+    const userData = localStorage.getItem('user')
+    const token = localStorage.getItem('token')
+    
+    if (!userData || !token) {
+      router.push('/hcp/login')
+      return
+    }
+    
+    setUser(JSON.parse(userData))
+    loadData()
+  }, [])
 
-  const toggleFavorite = (drugId: string) => {
-    const drug = mockDrugs.find(d => d.id === drugId);
-    if (!drug) return;
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token')
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  }
 
-    setFavoriteDrugs(prev => {
-      const exists = prev.find(d => d.id === drugId);
-      if (exists) {
-        return prev.filter(d => d.id !== drugId);
-      } else {
-        return [...prev, { ...drug, isFavorite: true }];
+  const loadData = async () => {
+    try {
+      // Load drugs
+      const drugsResponse = await fetch('/api/drugs', {
+        headers: getAuthHeaders()
+      })
+      if (drugsResponse.ok) {
+        const drugsData = await drugsResponse.json()
+        setDrugs(drugsData.drugs || [])
       }
-    });
-  };
 
-  const MessageCard = ({ message }: { message: Message }) => (
-    <div className={`border rounded-lg p-4 ${message.isRead ? 'bg-white' : 'bg-blue-50 border-blue-200'}`}>
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 mb-1">
-            {message.drugName}
-          </h3>
-          <div className="flex flex-wrap gap-2 mb-2">
-            {message.species.map(species => (
-              <span key={species} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                {species}
-              </span>
-            ))}
-            <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
-              {message.indication}
-            </span>
-          </div>
-        </div>
-        <button
-          onClick={() => markAsRead(message.id)}
-          className={`p-1 rounded ${message.isRead ? 'text-gray-400' : 'text-blue-600'}`}
-        >
-          {message.isRead ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-        </button>
-      </div>
-      
-      <p className="text-gray-700 text-sm mb-3">{message.summary}</p>
-      
-      <div className="flex items-center justify-between">
-        <div className="flex gap-2">
-          <a 
-            href={message.guidelinesLink} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center text-blue-600 hover:text-blue-800 text-sm"
-          >
-            <ExternalLink className="w-4 h-4 mr-1" />
-            Guidelines
-          </a>
-          <a 
-            href={message.pdfReportLink} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center text-green-600 hover:text-green-800 text-sm"
-          >
-            <FileText className="w-4 h-4 mr-1" />
-            Lab Report
-          </a>
-        </div>
-        <span className="text-xs text-gray-500">
-          {message.pharmaCompany} • {new Date(message.dateCreated).toLocaleDateString()}
-        </span>
-      </div>
-    </div>
-  );
+      // Load notifications
+      const notificationsResponse = await fetch('/api/notifications', {
+        headers: getAuthHeaders()
+      })
+      if (notificationsResponse.ok) {
+        const notificationsData = await notificationsResponse.json()
+        setNotifications(notificationsData.notifications || [])
+      }
 
-  const DrugCard = ({ drug, showFavoriteButton = false }: { drug: Drug; showFavoriteButton?: boolean }) => (
-    <div className="border rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-900 mb-1">
-            {drug.brandName}
-            {drug.genericName && (
-              <span className="text-gray-600 font-normal"> ({drug.genericName})</span>
-            )}
-          </h3>
-          <div className="flex flex-wrap gap-1 mb-2">
-            {drug.species.map(species => (
-              <span key={species} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                {species}
-              </span>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-1 mb-2">
-            {drug.indications.slice(0, 2).map(indication => (
-              <span key={indication} className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
-                {indication}
-              </span>
-            ))}
-            {drug.indications.length > 2 && (
-              <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
-                +{drug.indications.length - 2} more
-              </span>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {drug.routes.map(route => (
-              <span key={route} className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">
-                {route}
-              </span>
-            ))}
-          </div>
-        </div>
-        {showFavoriteButton && (
-          <button
-            onClick={() => toggleFavorite(drug.id)}
-            className={`p-1 rounded ${
-              favoriteDrugs.find(d => d.id === drug.id)
-                ? 'text-red-500 hover:text-red-700'
-                : 'text-gray-400 hover:text-red-500'
-            }`}
-          >
-            <Heart className={`w-5 h-5 ${
-              favoriteDrugs.find(d => d.id === drug.id) ? 'fill-current' : ''
-            }`} />
-          </button>
-        )}
-      </div>
+      // Load saved drugs
+      const savedResponse = await fetch('/api/drugs/saved', {
+        headers: getAuthHeaders()
+      })
+      if (savedResponse.ok) {
+        const savedData = await savedResponse.json()
+        setSavedDrugs(savedData.savedDrugs || [])
+      }
+    } catch (error) {
+      console.error('Error loading data:', error)
+    }
+  }
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      loadData()
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/drugs?q=${encodeURIComponent(searchQuery)}`, {
+        headers: getAuthHeaders()
+      })
       
-      <div className="flex items-center justify-between mt-3">
-        <div className="flex gap-2">
-          <Link 
-            href={`/drugs/${drug.id}`}
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-          >
-            View Details
-          </Link>
-          {drug.labelLink && (
-            <a 
-              href={drug.labelLink} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="flex items-center text-green-600 hover:text-green-800 text-sm"
-            >
-              <ExternalLink className="w-3 h-3 mr-1" />
-              Label
-            </a>
-          )}
-        </div>
-        {showFavoriteButton && (
-          <button
-            onClick={() => toggleFavorite(drug.id)}
-            className="flex items-center text-sm text-gray-600 hover:text-blue-600"
-          >
-            <Star className={`w-4 h-4 mr-1 ${
-              favoriteDrugs.find(d => d.id === drug.id) ? 'fill-current text-yellow-500' : ''
-            }`} />
-            Save
-          </button>
-        )}
-      </div>
+      if (response.ok) {
+        const data = await response.json()
+        setDrugs(data.drugs || [])
+      }
+    } catch (error) {
+      setError('Search failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const saveDrug = async (drugId: string) => {
+    try {
+      const response = await fetch('/api/drugs/saved', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ drugId })
+      })
+
+      if (response.ok) {
+        loadData() // Reload to update saved drugs
+      }
+    } catch (error) {
+      console.error('Error saving drug:', error)
+    }
+  }
+
+  const trackNotification = async (notificationId: string, action: 'opened' | 'clicked') => {
+    try {
+      await fetch(`/api/notifications/${notificationId}/track`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ action })
+      })
+    } catch (error) {
+      console.error('Error tracking notification:', error)
+    }
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    router.push('/')
+  }
+
+  if (!user) {
+    return <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
     </div>
-  );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation Header */}
+      {/* Header */}
       <nav className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
+              <Stethoscope className="w-8 h-8 text-blue-600 mr-3" />
               <h1 className="text-2xl font-bold text-blue-600">NotiVet</h1>
-              <span className="ml-3 text-gray-500">Veterinary Professional</span>
+              <span className="ml-4 text-sm text-gray-500">HCP Dashboard</span>
             </div>
-            
             <div className="flex items-center space-x-4">
-              <Link href="/drugs" className="text-gray-700 hover:text-blue-600">
-                Drug Database
-              </Link>
-              <button className="relative p-2 text-gray-700 hover:text-blue-600">
-                <Bell className="w-5 h-5" />
-                {messages.filter(m => !m.isRead).length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {messages.filter(m => !m.isRead).length}
-                  </span>
-                )}
+              <span className="text-gray-700">
+                Dr. {user.profile?.firstName} {user.profile?.lastName}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="flex items-center text-gray-500 hover:text-red-600"
+              >
+                <LogOut className="w-4 h-4 mr-1" />
+                Logout
               </button>
-              
-              <div className="relative">
-                <button className="flex items-center space-x-2 text-gray-700 hover:text-blue-600">
-                  <User className="w-5 h-5" />
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-              </div>
             </div>
           </div>
         </div>
@@ -230,138 +203,218 @@ export default function HCPDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome back, Dr. Smith</h2>
-          <p className="text-gray-600">Stay updated with the latest veterinary drug information and notifications.</p>
+        <div className="bg-blue-50 rounded-lg p-6 mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Welcome, Dr. {user.profile?.firstName}!
+          </h2>
+          <p className="text-gray-600">
+            Clinic: {user.profile?.clinicName || 'Not specified'} • 
+            Specialties: {(() => {
+              try {
+                return user.profile?.specialties ? JSON.parse(user.profile.specialties).join(', ') : 'Not specified';
+              } catch {
+                return user.profile?.specialties || 'Not specified';
+              }
+            })()}
+          </p>
+          <div className="mt-4 flex space-x-4 text-sm">
+            <div className="bg-white rounded-lg p-3">
+              <div className="font-semibold text-blue-600">{notifications.length}</div>
+              <div className="text-gray-500">New Notifications</div>
+            </div>
+            <div className="bg-white rounded-lg p-3">
+              <div className="font-semibold text-blue-600">{savedDrugs.length}</div>
+              <div className="text-gray-500">Saved Drugs</div>
+            </div>
+            <div className="bg-white rounded-lg p-3">
+              <div className="font-semibold text-blue-600">{drugs.length}</div>
+              <div className="text-gray-500">Drugs Available</div>
+            </div>
+          </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6 max-w-md">
-          <button
-            onClick={() => setActiveTab('messages')}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'messages' 
-                ? 'bg-white text-blue-600 shadow-sm' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            New Messages
-            {messages.filter(m => !m.isRead).length > 0 && (
-              <span className="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                {messages.filter(m => !m.isRead).length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('favorites')}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'favorites' 
-                ? 'bg-white text-blue-600 shadow-sm' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Saved Drugs
-            <span className="ml-2 text-xs">({favoriteDrugs.length})</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('products')}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'products' 
-                ? 'bg-white text-blue-600 shadow-sm' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            New Products
-          </button>
+        <div className="border-b border-gray-200 mb-6">
+          <nav className="-mb-px flex space-x-8">
+            {[
+              { id: 'drugs', name: 'Drug Database', icon: BookOpen },
+              { id: 'notifications', name: 'Notifications', icon: Bell },
+              { id: 'saved', name: 'Saved Drugs', icon: Heart }
+            ].map(({ id, name, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Icon className="w-4 h-4 mr-2" />
+                {name}
+              </button>
+            ))}
+          </nav>
         </div>
 
-        {/* Content Area */}
-        <div className="space-y-6">
-          {activeTab === 'messages' && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900">Drug Alerts & Updates</h3>
-                <span className="text-sm text-gray-500">
-                  {messages.filter(m => !m.isRead).length} unread
-                </span>
+        {/* Drug Database Tab */}
+        {activeTab === 'drugs' && (
+          <div className="space-y-6">
+            {/* Search */}
+            <div className="flex space-x-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search drugs by name, active ingredient, or manufacturer..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                />
               </div>
-              
-              {messages.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-lg border">
-                  <Bell className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
-                  <p className="text-gray-500">You'll receive notifications about new drugs and updates here.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {messages.map((message) => (
-                    <MessageCard key={message.id} message={message} />
-                  ))}
-                </div>
-              )}
+              <button
+                onClick={handleSearch}
+                disabled={loading}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading ? 'Searching...' : 'Search'}
+              </button>
             </div>
-          )}
 
-          {activeTab === 'favorites' && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900">Saved Drugs</h3>
-                <Link 
-                  href="/drugs"
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                >
-                  Browse all drugs →
-                </Link>
-              </div>
-              
-              {favoriteDrugs.length === 0 ? (
-                <div className="text-center py-12 bg-white rounded-lg border">
-                  <Heart className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No saved drugs yet</h3>
-                  <p className="text-gray-500 mb-4">Save frequently used drugs for quick access.</p>
-                  <Link 
-                    href="/drugs"
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+            {/* Drug Results */}
+            <div className="grid gap-6">
+              {drugs.map((drug) => (
+                <div key={drug.id} className="bg-white rounded-lg shadow p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900">{drug.name}</h3>
+                      {drug.genericName && (
+                        <p className="text-gray-600">Generic: {drug.genericName}</p>
+                      )}
+                      <p className="text-sm text-gray-500">
+                        {drug.manufacturer} • {drug.activeIngredient}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => saveDrug(drug.id)}
+                      className="flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200"
+                    >
+                      <Heart className="w-4 h-4 mr-1" />
+                      Save
+                    </button>
+                  </div>
+                  
+                  <div className="grid md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <strong>Species:</strong> {drug.species.join(', ')}
+                    </div>
+                    <div>
+                      <strong>Delivery:</strong> {drug.deliveryMethods.join(', ')}
+                    </div>
+                    {drug.dosage && (
+                      <div>
+                        <strong>Dosage:</strong> {drug.dosage}
+                      </div>
+                    )}
+                    {drug.withdrawalTime && (
+                      <div>
+                        <strong>Withdrawal:</strong> {drug.withdrawalTime}
+                      </div>
+                    )}
+                  </div>
+
+                  {drug.description && (
+                    <p className="mt-4 text-gray-600">{drug.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Notifications Tab */}
+        {activeTab === 'notifications' && (
+          <div className="space-y-4">
+            {notifications.map((notification) => (
+              <div key={notification.id} className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900">{notification.title}</h3>
+                    <div className="flex items-center text-sm text-gray-500 mt-1">
+                      <Building className="w-4 h-4 mr-1" />
+                      {notification.sender.companyName} • {notification.sender.contactName}
+                    </div>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-400">
+                    <Clock className="w-4 h-4 mr-1" />
+                    {new Date(notification.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+                
+                <p className="text-gray-700 mb-4">{notification.content}</p>
+                
+                {notification.drugInfo && (
+                  <div className="bg-blue-50 rounded-lg p-3 mb-4">
+                    <strong className="text-blue-900">Drug Information:</strong>
+                    <p className="text-blue-800 mt-1">{notification.drugInfo}</p>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center">
+                  <div className="text-sm text-gray-500">
+                    Target Species: {notification.targetSpecies.join(', ')}
+                  </div>
+                  <button
+                    onClick={() => trackNotification(notification.id, 'clicked')}
+                    className="flex items-center text-blue-600 hover:text-blue-800"
                   >
-                    Browse Drug Database
-                  </Link>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {favoriteDrugs.map((drug) => (
-                    <DrugCard key={drug.id} drug={drug} />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'products' && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold text-gray-900">New Products</h3>
-                <div className="flex space-x-2">
-                  <button className="flex items-center space-x-1 text-gray-600 hover:text-gray-900 px-3 py-1 rounded border">
-                    <Filter className="w-4 h-4" />
-                    <span className="text-sm">Filter</span>
+                    <Eye className="w-4 h-4 mr-1" />
+                    Mark as Read
                   </button>
-                  <select className="border rounded px-3 py-1 text-sm">
-                    <option>Date added (newest)</option>
-                    <option>Date added (oldest)</option>
-                    <option>Name (A-Z)</option>
-                  </select>
                 </div>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {newProducts.map((drug) => (
-                  <DrugCard key={drug.id} drug={drug} showFavoriteButton={true} />
-                ))}
+            ))}
+            
+            {notifications.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                No notifications yet. Check back later for updates from pharmaceutical companies.
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
+
+        {/* Saved Drugs Tab */}
+        {activeTab === 'saved' && (
+          <div className="space-y-4">
+            {savedDrugs.map((saved) => (
+              <div key={saved.id} className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">{saved.drug.name}</h3>
+                    {saved.drug.genericName && (
+                      <p className="text-gray-600">Generic: {saved.drug.genericName}</p>
+                    )}
+                    <p className="text-sm text-gray-500">
+                      {saved.drug.manufacturer} • Saved on {new Date(saved.savedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                
+                {saved.drug.description && (
+                  <p className="mt-3 text-gray-700">{saved.drug.description}</p>
+                )}
+              </div>
+            ))}
+            
+            {savedDrugs.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                No saved drugs yet. Start saving drugs from the Drug Database for quick reference.
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
-  );
+  )
 }

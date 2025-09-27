@@ -1,0 +1,172 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  password    String
+  userType    String   // "HCP" or "PHARMA"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // HCP specific fields
+  hcpProfile  HCPProfile?
+
+  // Pharma specific fields
+  pharmaProfile PharmaProfile?
+
+  // Relations
+  notifications        Notification[] @relation("NotificationRecipient")
+  sentNotifications    Notification[] @relation("NotificationSender")
+  savedDrugs           SavedDrug[]
+  notificationActivity NotificationActivity[]
+
+  @@map("users")
+}
+
+model HCPProfile {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  firstName    String
+  lastName     String
+  license      String?
+  clinicName   String?
+  address      String?
+  city         String?
+  state        String?
+  zipCode      String?
+  phone        String?
+  
+  specialties  String?  // JSON string of array
+  verified     Boolean  @default(false)
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("hcp_profiles")
+}
+
+model PharmaProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  companyName String
+  contactName String
+  title       String?
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  phone       String?
+  
+  verified    Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("pharma_profiles")
+}
+
+model Drug {
+  id                String    @id @default(cuid())
+  name              String
+  genericName       String?
+  manufacturer      String
+  activeIngredient  String
+  
+  species           String?   // JSON string of array
+  deliveryMethods   String?   // JSON string of array
+  
+  description       String?
+  dosage            String?
+  contraindications String?
+  sideEffects       String?
+  warnings          String?
+  faradInfo         String?
+  
+  withdrawalTime    String?
+  approvalDate      DateTime?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  savedBy           SavedDrug[]
+
+  @@map("drugs")
+}
+
+model SavedDrug {
+  id     String @id @default(cuid())
+  userId String
+  drugId String
+  
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  drug   Drug   @relation(fields: [drugId], references: [id], onDelete: Cascade)
+  
+  savedAt DateTime @default(now())
+
+  @@unique([userId, drugId])
+  @@map("saved_drugs")
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  senderId    String
+  title       String
+  content     String
+  drugInfo    String?
+  targetSpecies String? // JSON string of array
+  
+  sender      User     @relation("NotificationSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipients  User[]   @relation("NotificationRecipient")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  activities  NotificationActivity[]
+
+  @@map("notifications")
+}
+
+model NotificationActivity {
+  id             String      @id @default(cuid())
+  notificationId String
+  userId         String
+  status         String      // "SENT", "DELIVERED", "OPENED", "CLICKED"
+  timestamp      DateTime    @default(now())
+  
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId, status])
+  @@map("notification_activities")
+}
+
+model Analytics {
+  id               String   @id @default(cuid())
+  notificationId   String?
+  senderId         String
+  
+  totalRecipients  Int      @default(0)
+  deliveredCount   Int      @default(0)
+  openedCount      Int      @default(0)
+  clickedCount     Int      @default(0)
+  
+  date             DateTime @default(now())
+  
+  @@map("analytics")
+}

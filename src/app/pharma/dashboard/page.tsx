@@ -1,155 +1,186 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { 
-  BarChart3, 
-  Users, 
+  Building, 
   Send, 
-  MessageCircle,
-  TrendingUp,
-  Eye,
-  Heart,
-  FileText,
+  BarChart3, 
+  LogOut,
   Plus,
-  Filter,
-  Calendar,
-  Target,
-  ChevronDown,
-  User
-} from 'lucide-react';
+  Eye,
+  TrendingUp,
+  Users,
+  MessageCircle,
+  Calendar
+} from 'lucide-react'
 
-interface AnalyticsData {
-  messagesSent: number;
-  vetsReached: number;
-  openRate: number;
-  clickRate: number;
-  favoriteRate: number;
+interface Notification {
+  id: string
+  title: string
+  content: string
+  drugInfo?: string
+  targetSpecies: string[]
+  createdAt: string
+  recipientCount: number
+  activities: any[]
 }
 
-interface MessageData {
-  id: string;
-  drugName: string;
-  targetTags: string[];
-  targetSpecies: string[];
-  sentDate: string;
-  vetsReached: number;
-  openRate: number;
-  clickRate: number;
+interface Analytics {
+  overview: {
+    totalRecipients: number
+    totalDelivered: number
+    totalOpened: number
+    totalClicked: number
+    openRate: number
+    clickRate: number
+    clickThroughRate: number
+  }
+  topNotifications: any[]
 }
 
 export default function PharmaDashboard() {
-  const [activeTab, setActiveTab] = useState('analytics');
-  const [newMessage, setNewMessage] = useState({
-    drugName: '',
-    summary: '',
-    targetTags: [] as string[],
-    targetSpecies: [] as string[],
-    guidelinesLink: '',
-    pdfReportLink: ''
-  });
+  const router = useRouter()
+  const [user, setUser] = useState<any>(null)
+  const [activeTab, setActiveTab] = useState('notifications')
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [analytics, setAnalytics] = useState<Analytics | null>(null)
+  const [showNewNotification, setShowNewNotification] = useState(false)
+  const [newNotification, setNewNotification] = useState({
+    title: '',
+    content: '',
+    drugInfo: '',
+    targetSpecies: [] as string[]
+  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  const analytics: AnalyticsData = {
-    messagesSent: 24,
-    vetsReached: 1247,
-    openRate: 68.5,
-    clickRate: 42.3,
-    favoriteRate: 15.8
-  };
+  const speciesOptions = [
+    'CANINE', 'FELINE', 'EQUINE', 'BOVINE', 
+    'OVINE', 'CAPRINE', 'PORCINE', 'AVIAN', 'EXOTIC'
+  ]
 
-  const recentMessages: MessageData[] = [
-    {
-      id: '1',
-      drugName: 'Librela (bedinvetmab)',
-      targetTags: ['Anesthesiology', 'Internal Medicine'],
-      targetSpecies: ['Dogs'],
-      sentDate: '2024-03-01',
-      vetsReached: 324,
-      openRate: 72.1,
-      clickRate: 45.6
-    },
-    {
-      id: '2',
-      drugName: 'Solensia (frunevetmab)',
-      targetTags: ['Internal Medicine'],
-      targetSpecies: ['Cats'],
-      sentDate: '2024-02-25',
-      vetsReached: 287,
-      openRate: 65.2,
-      clickRate: 38.9
-    },
-    {
-      id: '3',
-      drugName: 'Sileo (dexmedetomidine)',
-      targetTags: ['Anesthesiology', 'Emergency Care'],
-      targetSpecies: ['Dogs'],
-      sentDate: '2024-02-20',
-      vetsReached: 445,
-      openRate: 69.8,
-      clickRate: 44.2
+  useEffect(() => {
+    const userData = localStorage.getItem('user')
+    const token = localStorage.getItem('token')
+    
+    if (!userData || !token) {
+      router.push('/pharma/login')
+      return
     }
-  ];
+    
+    setUser(JSON.parse(userData))
+    loadData()
+  }, [])
 
-  const availableTags = [
-    'Anesthesiology', 'Dermatology', 'Avians', 'Large Animal', 'Exotics',
-    'Internal Medicine', 'Surgery', 'Emergency Care', 'Cardiology', 'Oncology'
-  ];
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token')
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  }
 
-  const availableSpecies = [
-    'Dogs', 'Cats', 'Horses', 'Cattle', 'Poultry', 'Exotic Animals', 'Large Animals'
-  ];
+  const loadData = async () => {
+    try {
+      // Load notifications
+      const notificationsResponse = await fetch('/api/notifications', {
+        headers: getAuthHeaders()
+      })
+      if (notificationsResponse.ok) {
+        const notificationsData = await notificationsResponse.json()
+        setNotifications(notificationsData.notifications || [])
+      }
 
-  const toggleTag = (tag: string) => {
-    setNewMessage(prev => ({
-      ...prev,
-      targetTags: prev.targetTags.includes(tag)
-        ? prev.targetTags.filter(t => t !== tag)
-        : [...prev.targetTags, tag]
-    }));
-  };
+      // Load analytics
+      const analyticsResponse = await fetch('/api/analytics', {
+        headers: getAuthHeaders()
+      })
+      if (analyticsResponse.ok) {
+        const analyticsData = await analyticsResponse.json()
+        setAnalytics(analyticsData)
+      }
+    } catch (error) {
+      console.error('Error loading data:', error)
+    }
+  }
 
-  const toggleSpecies = (species: string) => {
-    setNewMessage(prev => ({
+  const handleSendNotification = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(newNotification)
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setShowNewNotification(false)
+        setNewNotification({
+          title: '',
+          content: '',
+          drugInfo: '',
+          targetSpecies: []
+        })
+        loadData() // Reload data
+      } else {
+        setError(data.error || 'Failed to send notification')
+      }
+    } catch (error) {
+      setError('Network error. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSpeciesChange = (species: string) => {
+    setNewNotification(prev => ({
       ...prev,
       targetSpecies: prev.targetSpecies.includes(species)
         ? prev.targetSpecies.filter(s => s !== species)
         : [...prev.targetSpecies, species]
-    }));
-  };
+    }))
+  }
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    // In a real app, this would send to an API
-    alert('Message sent to veterinarians!');
-    setNewMessage({
-      drugName: '',
-      summary: '',
-      targetTags: [],
-      targetSpecies: [],
-      guidelinesLink: '',
-      pdfReportLink: ''
-    });
-  };
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    router.push('/')
+  }
+
+  if (!user) {
+    return <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-500"></div>
+    </div>
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation Header */}
+      {/* Header */}
       <nav className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
+              <Building className="w-8 h-8 text-green-600 mr-3" />
               <h1 className="text-2xl font-bold text-green-600">NotiVet</h1>
-              <span className="ml-3 text-gray-500">Pharmaceutical Portal</span>
+              <span className="ml-4 text-sm text-gray-500">Pharma Dashboard</span>
             </div>
-            
             <div className="flex items-center space-x-4">
-              <div className="relative">
-                <button className="flex items-center space-x-2 text-gray-700 hover:text-green-600">
-                  <User className="w-5 h-5" />
-                  <span>Zoetis Representative</span>
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-              </div>
+              <span className="text-gray-700">
+                {user.profile?.companyName}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="flex items-center text-gray-500 hover:text-red-600"
+              >
+                <LogOut className="w-4 h-4 mr-1" />
+                Logout
+              </button>
             </div>
           </div>
         </div>
@@ -157,332 +188,299 @@ export default function PharmaDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Pharma Dashboard</h2>
-          <p className="text-gray-600">Manage your veterinary outreach campaigns and view engagement analytics.</p>
+        <div className="bg-green-50 rounded-lg p-6 mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Welcome, {user.profile?.companyName}!
+          </h2>
+          <p className="text-gray-600">
+            Contact: {user.profile?.contactName} • {user.profile?.title || 'Representative'}
+          </p>
+          
+          {analytics && (
+            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="bg-white rounded-lg p-3">
+                <div className="font-semibold text-green-600">{analytics.overview.totalRecipients}</div>
+                <div className="text-gray-500">Total Reached</div>
+              </div>
+              <div className="bg-white rounded-lg p-3">
+                <div className="font-semibold text-green-600">{analytics.overview.openRate}%</div>
+                <div className="text-gray-500">Open Rate</div>
+              </div>
+              <div className="bg-white rounded-lg p-3">
+                <div className="font-semibold text-green-600">{analytics.overview.clickRate}%</div>
+                <div className="text-gray-500">Click Rate</div>
+              </div>
+              <div className="bg-white rounded-lg p-3">
+                <div className="font-semibold text-green-600">{notifications.length}</div>
+                <div className="text-gray-500">Campaigns Sent</div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6 max-w-md">
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'analytics' 
-                ? 'bg-white text-green-600 shadow-sm' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Analytics
-          </button>
-          <button
-            onClick={() => setActiveTab('compose')}
-            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'compose' 
-                ? 'bg-white text-green-600 shadow-sm' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Compose Message
-          </button>
+        <div className="border-b border-gray-200 mb-6">
+          <nav className="-mb-px flex space-x-8">
+            {[
+              { id: 'notifications', name: 'Campaigns', icon: Send },
+              { id: 'analytics', name: 'Analytics', icon: BarChart3 }
+            ].map(({ id, name, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === id
+                    ? 'border-green-500 text-green-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <Icon className="w-4 h-4 mr-2" />
+                {name}
+              </button>
+            ))}
+          </nav>
         </div>
 
-        {/* Content Area */}
-        {activeTab === 'analytics' && (
+        {/* Notifications Tab */}
+        {activeTab === 'notifications' && (
           <div className="space-y-6">
-            {/* Key Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white rounded-lg border p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Messages Sent</p>
-                    <p className="text-2xl font-bold text-gray-900">{analytics.messagesSent}</p>
-                  </div>
-                  <Send className="w-8 h-8 text-blue-500" />
-                </div>
-                <p className="text-xs text-green-600 mt-2">↗ 12% from last month</p>
-              </div>
-
-              <div className="bg-white rounded-lg border p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Vets Reached</p>
-                    <p className="text-2xl font-bold text-gray-900">{analytics.vetsReached.toLocaleString()}</p>
-                  </div>
-                  <Users className="w-8 h-8 text-green-500" />
-                </div>
-                <p className="text-xs text-green-600 mt-2">↗ 8% from last month</p>
-              </div>
-
-              <div className="bg-white rounded-lg border p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Open Rate</p>
-                    <p className="text-2xl font-bold text-gray-900">{analytics.openRate}%</p>
-                  </div>
-                  <Eye className="w-8 h-8 text-purple-500" />
-                </div>
-                <p className="text-xs text-green-600 mt-2">↗ 5% from last month</p>
-              </div>
-
-              <div className="bg-white rounded-lg border p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Click Rate</p>
-                    <p className="text-2xl font-bold text-gray-900">{analytics.clickRate}%</p>
-                  </div>
-                  <TrendingUp className="w-8 h-8 text-orange-500" />
-                </div>
-                <p className="text-xs text-green-600 mt-2">↗ 3% from last month</p>
-              </div>
+            {/* New Notification Button */}
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-gray-900">Your Notification Campaigns</h3>
+              <button
+                onClick={() => setShowNewNotification(true)}
+                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                New Campaign
+              </button>
             </div>
 
-            {/* Recent Messages Performance */}
-            <div className="bg-white rounded-lg border p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-semibold text-gray-900">Recent Campaign Performance</h3>
-                <button className="flex items-center space-x-1 text-gray-600 hover:text-gray-900 px-3 py-1 rounded border">
-                  <Filter className="w-4 h-4" />
-                  <span className="text-sm">Filter</span>
-                </button>
-              </div>
+            {/* New Notification Form */}
+            {showNewNotification && (
+              <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+                <h4 className="text-lg font-semibold mb-4">Create New Notification Campaign</h4>
+                
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
+                    <p className="text-sm text-red-600">{error}</p>
+                  </div>
+                )}
 
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Drug Name</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Target</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Date Sent</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Vets Reached</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Open Rate</th>
-                      <th className="text-left py-3 px-4 font-medium text-gray-900">Click Rate</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentMessages.map((message) => (
-                      <tr key={message.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-4 px-4">
-                          <div className="font-medium text-gray-900">{message.drugName}</div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="flex flex-wrap gap-1">
-                            {message.targetSpecies.map(species => (
-                              <span key={species} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                                {species}
-                              </span>
-                            ))}
-                          </div>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {message.targetTags.slice(0, 2).map(tag => (
-                              <span key={tag} className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
-                                {tag}
-                              </span>
-                            ))}
-                            {message.targetTags.length > 2 && (
-                              <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
-                                +{message.targetTags.length - 2}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 text-gray-600">
-                          {new Date(message.sentDate).toLocaleDateString()}
-                        </td>
-                        <td className="py-4 px-4 text-gray-900 font-medium">
-                          {message.vetsReached}
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            message.openRate > 70 
-                              ? 'bg-green-100 text-green-800'
-                              : message.openRate > 60
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {message.openRate}%
-                          </span>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            message.clickRate > 40 
-                              ? 'bg-green-100 text-green-800'
-                              : message.clickRate > 30
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {message.clickRate}%
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <form onSubmit={handleSendNotification} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Campaign Title
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                      value={newNotification.title}
+                      onChange={(e) => setNewNotification({...newNotification, title: e.target.value})}
+                      placeholder="e.g., New Pain Management Solution for Canines"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Message Content
+                    </label>
+                    <textarea
+                      required
+                      rows={4}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                      value={newNotification.content}
+                      onChange={(e) => setNewNotification({...newNotification, content: e.target.value})}
+                      placeholder="Write your message to veterinary professionals..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Drug Information (Optional)
+                    </label>
+                    <textarea
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                      value={newNotification.drugInfo}
+                      onChange={(e) => setNewNotification({...newNotification, drugInfo: e.target.value})}
+                      placeholder="Additional drug details, dosage information, etc."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Target Species (Select at least one)
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {speciesOptions.map(species => (
+                        <label key={species} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            className="mr-2 text-green-600 focus:ring-green-500"
+                            checked={newNotification.targetSpecies.includes(species)}
+                            onChange={() => handleSpeciesChange(species)}
+                          />
+                          <span className="text-sm">{species.toLowerCase()}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex space-x-4">
+                    <button
+                      type="submit"
+                      disabled={loading || newNotification.targetSpecies.length === 0}
+                      className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {loading ? 'Sending...' : 'Send Campaign'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewNotification(false)}
+                      className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
               </div>
+            )}
+
+            {/* Sent Notifications */}
+            <div className="space-y-4">
+              {notifications.map((notification) => (
+                <div key={notification.id} className="bg-white rounded-lg shadow p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex-1">
+                      <h4 className="text-lg font-semibold text-gray-900">{notification.title}</h4>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Target Species: {notification.targetSpecies.join(', ')}
+                      </p>
+                    </div>
+                    <div className="text-right text-sm text-gray-500">
+                      <div className="flex items-center">
+                        <Calendar className="w-4 h-4 mr-1" />
+                        {new Date(notification.createdAt).toLocaleDateString()}
+                      </div>
+                      <div className="flex items-center mt-1">
+                        <Users className="w-4 h-4 mr-1" />
+                        {notification.recipientCount} recipients
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-gray-700 mb-4">{notification.content}</p>
+
+                  {notification.drugInfo && (
+                    <div className="bg-green-50 rounded-lg p-3 mb-4">
+                      <strong className="text-green-900">Drug Info:</strong>
+                      <p className="text-green-800 mt-1">{notification.drugInfo}</p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-center pt-4 border-t">
+                    <div className="text-sm text-gray-500">
+                      Opens: {notification.activities.filter(a => a.status === 'OPENED').length} • 
+                      Clicks: {notification.activities.filter(a => a.status === 'CLICKED').length}
+                    </div>
+                    <button className="flex items-center text-green-600 hover:text-green-800">
+                      <Eye className="w-4 h-4 mr-1" />
+                      View Details
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {notifications.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  No campaigns sent yet. Create your first notification campaign to reach veterinary professionals.
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {activeTab === 'compose' && (
-          <div className="max-w-4xl">
-            <div className="bg-white rounded-lg border p-8">
-              <h3 className="text-2xl font-semibold text-gray-900 mb-6">Compose New Message</h3>
+        {/* Analytics Tab */}
+        {activeTab === 'analytics' && analytics && (
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-gray-900">Campaign Performance</h3>
+
+            {/* Overview Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-white p-6 rounded-lg shadow">
+                <div className="flex items-center">
+                  <Users className="w-8 h-8 text-blue-500 mr-3" />
+                  <div>
+                    <div className="text-2xl font-bold">{analytics.overview.totalRecipients}</div>
+                    <div className="text-sm text-gray-500">Total Recipients</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow">
+                <div className="flex items-center">
+                  <Eye className="w-8 h-8 text-green-500 mr-3" />
+                  <div>
+                    <div className="text-2xl font-bold">{analytics.overview.totalOpened}</div>
+                    <div className="text-sm text-gray-500">Total Opens</div>
+                    <div className="text-xs text-green-600">{analytics.overview.openRate}% rate</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow">
+                <div className="flex items-center">
+                  <MessageCircle className="w-8 h-8 text-purple-500 mr-3" />
+                  <div>
+                    <div className="text-2xl font-bold">{analytics.overview.totalClicked}</div>
+                    <div className="text-sm text-gray-500">Total Clicks</div>
+                    <div className="text-xs text-purple-600">{analytics.overview.clickRate}% rate</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-lg shadow">
+                <div className="flex items-center">
+                  <TrendingUp className="w-8 h-8 text-orange-500 mr-3" />
+                  <div>
+                    <div className="text-2xl font-bold">{analytics.overview.clickThroughRate}%</div>
+                    <div className="text-sm text-gray-500">Click-through Rate</div>
+                    <div className="text-xs text-orange-600">clicks/opens</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Top Performing Notifications */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h4 className="text-lg font-semibold mb-4">Top Performing Campaigns</h4>
               
-              <form onSubmit={handleSendMessage} className="space-y-6">
-                {/* Drug Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Drug Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newMessage.drugName}
-                    onChange={(e) => setNewMessage(prev => ({ ...prev, drugName: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                    placeholder="e.g., Librela (bedinvetmab)"
-                    required
-                  />
-                </div>
-
-                {/* Message Summary */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Message Summary
-                  </label>
-                  <textarea
-                    value={newMessage.summary}
-                    onChange={(e) => setNewMessage(prev => ({ ...prev, summary: e.target.value }))}
-                    rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                    placeholder="Brief description of the drug and its benefits..."
-                    required
-                  />
-                </div>
-
-                {/* Target Species */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Target Species
-                  </label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    {availableSpecies.map(species => (
-                      <label key={species} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={newMessage.targetSpecies.includes(species)}
-                          onChange={() => toggleSpecies(species)}
-                          className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                        />
-                        <span className="text-sm text-gray-700">{species}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Target Specialties */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Target Veterinary Specialties
-                  </label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                    {availableTags.map(tag => (
-                      <label key={tag} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={newMessage.targetTags.includes(tag)}
-                          onChange={() => toggleTag(tag)}
-                          className="rounded border-gray-300 text-green-600 focus:ring-green-500"
-                        />
-                        <span className="text-sm text-gray-700">{tag}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Links */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Guidelines/Dosing Link
-                    </label>
-                    <input
-                      type="url"
-                      value={newMessage.guidelinesLink}
-                      onChange={(e) => setNewMessage(prev => ({ ...prev, guidelinesLink: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                      placeholder="https://example.com/guidelines"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      PDF Report/Lab Data Link
-                    </label>
-                    <input
-                      type="url"
-                      value={newMessage.pdfReportLink}
-                      onChange={(e) => setNewMessage(prev => ({ ...prev, pdfReportLink: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-                      placeholder="https://example.com/report.pdf"
-                    />
-                  </div>
-                </div>
-
-                {/* Preview */}
-                {newMessage.drugName && (
-                  <div className="bg-gray-50 border rounded-lg p-4">
-                    <h4 className="font-medium text-gray-900 mb-2">Message Preview</h4>
-                    <div className="bg-white border rounded p-4">
-                      <h5 className="font-semibold text-gray-900 mb-1">{newMessage.drugName}</h5>
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {newMessage.targetSpecies.map(species => (
-                          <span key={species} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                            {species}
-                          </span>
-                        ))}
+              {analytics.topNotifications.length > 0 ? (
+                <div className="space-y-3">
+                  {analytics.topNotifications.slice(0, 5).map((notification, index) => (
+                    <div key={notification.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex-1">
+                        <div className="font-medium">{notification.title}</div>
+                        <div className="text-sm text-gray-500">
+                          {notification.recipients} recipients • {notification.targetSpecies.join(', ')}
+                        </div>
                       </div>
-                      <p className="text-gray-700 text-sm mb-2">{newMessage.summary}</p>
-                      <div className="flex gap-2 text-sm">
-                        {newMessage.guidelinesLink && (
-                          <span className="text-blue-600">📋 Guidelines</span>
-                        )}
-                        {newMessage.pdfReportLink && (
-                          <span className="text-green-600">📄 Lab Report</span>
-                        )}
+                      <div className="text-right text-sm">
+                        <div className="font-semibold text-green-600">{notification.openRate.toFixed(1)}% opens</div>
+                        <div className="text-gray-500">{notification.clickRate.toFixed(1)}% clicks</div>
                       </div>
                     </div>
-                  </div>
-                )}
-
-                {/* Estimated Reach */}
-                {(newMessage.targetSpecies.length > 0 || newMessage.targetTags.length > 0) && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="flex items-center space-x-2">
-                      <Target className="w-5 h-5 text-blue-600" />
-                      <span className="font-medium text-blue-900">Estimated Reach</span>
-                    </div>
-                    <p className="text-blue-800 mt-1">
-                      Approximately <strong>{Math.round(Math.random() * 500 + 200)}</strong> veterinarians 
-                      match your targeting criteria.
-                    </p>
-                  </div>
-                )}
-
-                {/* Submit Button */}
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={!newMessage.drugName || !newMessage.summary || newMessage.targetSpecies.length === 0}
-                    className="flex items-center space-x-2 bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
-                  >
-                    <Send className="w-4 h-4" />
-                    <span>Send Message to Veterinarians</span>
-                  </button>
+                  ))}
                 </div>
-              </form>
+              ) : (
+                <p className="text-gray-500">No campaigns yet. Send your first campaign to see performance data.</p>
+              )}
             </div>
           </div>
         )}
       </div>
     </div>
-  );
+  )
 }
