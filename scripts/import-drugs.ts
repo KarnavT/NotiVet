@@ -4,6 +4,21 @@ import { parse } from 'csv-parse/sync'
 
 const db = new PrismaClient()
 
+// Type for CSV record structure
+interface CSVRecord {
+  'Product Code:'?: string;
+  'Animal Species'?: string;
+  'Establishment Code'?: string;
+  'Establishment Name'?: string;
+  'Subsidiaries'?: string;
+  'Product True Name'?: string;
+  'Agent(s):'?: string;
+  'Trade Name(s):'?: string;
+  'Distributor(s):'?: string;
+  'Usage'?: string;
+  [key: string]: any;
+}
+
 // Species mapping from CSV to our enum values
 const SPECIES_MAPPING: Record<string, string> = {
   'Canine': 'CANINE',
@@ -71,7 +86,7 @@ async function importDrugs() {
     const csvContent = readFileSync('./data/AnimalDrugs.csv', 'utf-8')
     
     // Parse CSV
-    const records = parse(csvContent, {
+    const records: CSVRecord[] = parse(csvContent, {
       columns: true,
       skip_empty_lines: true,
       relax_quotes: true,
@@ -96,6 +111,7 @@ async function importDrugs() {
         const agents = cleanHtmlTags(record['Agent(s):'] || '')
         const tradeName = cleanHtmlTags(record['Trade Name(s):'] || '')
         const distributors = cleanHtmlTags(record['Distributor(s):'] || '')
+        const usage = cleanHtmlTags(record['Usage'] || '')
         
         // Map species to our enum format
         const mappedSpecies = mapSpecies(animalSpecies)
@@ -119,6 +135,7 @@ async function importDrugs() {
             species: JSON.stringify(mappedSpecies),
             deliveryMethods: JSON.stringify(['INJECTABLE']), // Default delivery method
             description: productTrueName !== primaryName ? productTrueName : undefined,
+            usage: usage || undefined,
             productCode: productCode,
             establishmentCode: establishmentCode,
             subsidiaries: subsidiaries !== 'Not Applicable' ? subsidiaries : undefined,

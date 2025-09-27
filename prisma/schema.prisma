@@ -90,6 +90,7 @@ model Drug {
   deliveryMethods   String?   // JSON string of array
   
   description       String?
+  usage             String?   // Usage information from CSV
   dosage            String?
   contraindications String?
   sideEffects       String?

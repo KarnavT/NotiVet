@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { withAnyAuth, type AuthenticatedRequest } from '@/lib/middleware'
 import { hcpProfileUpdateSchema, pharmaProfileUpdateSchema } from '@/lib/validations'
-import { UserType } from '@prisma/client'
 
 async function getProfile(req: AuthenticatedRequest) {
   try {
@@ -23,7 +22,7 @@ async function getProfile(req: AuthenticatedRequest) {
         id: user.id,
         email: user.email,
         userType: user.userType,
-        profile: user.userType === UserType.HCP ? user.hcpProfile : user.pharmaProfile
+        profile: user.userType === 'HCP' ? user.hcpProfile : user.pharmaProfile
       }
     })
   } catch (error) {
@@ -40,28 +39,54 @@ async function updateProfile(req: AuthenticatedRequest) {
 
     let updatedUser
 
-    if (userType === UserType.HCP) {
+    if (userType === 'HCP') {
       const validatedData = hcpProfileUpdateSchema.parse(body)
+      
+      // Convert specialties array to JSON string if provided
+      const updateData = {
+        ...validatedData,
+        specialties: validatedData.specialties ? JSON.stringify(validatedData.specialties) : undefined
+      }
+      
+      // For create, we need to provide required fields with defaults
+      const createData = {
+        firstName: validatedData.firstName || '',
+        lastName: validatedData.lastName || '',
+        ...updateData
+      }
       
       updatedUser = await db.user.update({
         where: { id: userId },
         data: {
           hcpProfile: {
-            update: validatedData
+            upsert: {
+              create: createData,
+              update: updateData
+            }
           }
         },
         include: {
           hcpProfile: true
         }
       })
-    } else if (userType === UserType.PHARMA) {
+    } else if (userType === 'PHARMA') {
       const validatedData = pharmaProfileUpdateSchema.parse(body)
+      
+      // For create, we need to provide required fields with defaults
+      const createData = {
+        companyName: validatedData.companyName || '',
+        contactName: validatedData.contactName || '',
+        ...validatedData
+      }
       
       updatedUser = await db.user.update({
         where: { id: userId },
         data: {
           pharmaProfile: {
-            update: validatedData
+            upsert: {
+              create: createData,
+              update: validatedData
+            }
           }
         },
         include: {
@@ -78,7 +103,7 @@ async function updateProfile(req: AuthenticatedRequest) {
         id: updatedUser.id,
         email: updatedUser.email,
         userType: updatedUser.userType,
-        profile: userType === UserType.HCP ? updatedUser.hcpProfile : updatedUser.pharmaProfile
+        profile: userType === 'HCP' ? (updatedUser as any).hcpProfile : (updatedUser as any).pharmaProfile
       }
     })
 
