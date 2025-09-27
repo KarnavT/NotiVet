@@ -12,7 +12,8 @@ import {
   Heart,
   Eye,
   Clock,
-  Building
+  Building,
+  X
 } from 'lucide-react'
 
 interface Drug {
@@ -56,6 +57,7 @@ export default function HCPDashboard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [removingDrug, setRemovingDrug] = useState<string | null>(null)
 
   useEffect(() => {
     const userData = localStorage.getItem('user')
@@ -150,6 +152,34 @@ export default function HCPDashboard() {
     }
   }
 
+  const unsaveDrug = async (savedDrugId: string) => {
+    setRemovingDrug(savedDrugId)
+    try {
+      // Optimistically update UI by removing the drug from the list immediately
+      setSavedDrugs(prevSaved => prevSaved.filter(saved => saved.id !== savedDrugId))
+      
+      const response = await fetch(`/api/drugs/saved/${savedDrugId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      })
+
+      if (response.ok) {
+        // Success - the optimistic update was correct
+        console.log('Drug successfully removed from saved list')
+      } else {
+        // Error - revert the optimistic update by reloading data
+        console.error('Failed to remove drug from saved list')
+        loadData() // Reload to get correct state
+      }
+    } catch (error) {
+      console.error('Error removing saved drug:', error)
+      // Revert the optimistic update by reloading data
+      loadData()
+    } finally {
+      setRemovingDrug(null)
+    }
+  }
+
   const trackNotification = async (notificationId: string, action: 'opened' | 'clicked') => {
     try {
       await fetch(`/api/notifications/${notificationId}/track`, {
@@ -207,7 +237,7 @@ export default function HCPDashboard() {
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
             Welcome, Dr. {user.profile?.firstName}!
           </h2>
-          <p className="text-gray-600">
+          <p className="text-gray-700">
             Clinic: {user.profile?.clinicName || 'Not specified'} • 
             Specialties: {(() => {
               try {
@@ -290,9 +320,9 @@ export default function HCPDashboard() {
                     <div>
                       <h3 className="text-xl font-semibold text-gray-900">{drug.name}</h3>
                       {drug.genericName && (
-                        <p className="text-gray-600">Generic: {drug.genericName}</p>
+                        <p className="text-gray-700">Generic: {drug.genericName}</p>
                       )}
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-gray-600">
                         {drug.manufacturer} • {drug.activeIngredient}
                       </p>
                     </div>
@@ -305,27 +335,27 @@ export default function HCPDashboard() {
                     </button>
                   </div>
                   
-                  <div className="grid md:grid-cols-2 gap-4 text-sm">
+                  <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-800">
                     <div>
-                      <strong>Species:</strong> {drug.species.join(', ')}
+                      <strong className="text-gray-900">Species:</strong> {drug.species.join(', ')}
                     </div>
                     <div>
-                      <strong>Delivery:</strong> {drug.deliveryMethods.join(', ')}
+                      <strong className="text-gray-900">Delivery:</strong> {drug.deliveryMethods.join(', ')}
                     </div>
                     {drug.dosage && (
                       <div>
-                        <strong>Dosage:</strong> {drug.dosage}
+                        <strong className="text-gray-900">Dosage:</strong> {drug.dosage}
                       </div>
                     )}
                     {drug.withdrawalTime && (
                       <div>
-                        <strong>Withdrawal:</strong> {drug.withdrawalTime}
+                        <strong className="text-gray-900">Withdrawal:</strong> {drug.withdrawalTime}
                       </div>
                     )}
                   </div>
 
                   {drug.description && (
-                    <p className="mt-4 text-gray-600">{drug.description}</p>
+                    <p className="mt-4 text-gray-800">{drug.description}</p>
                   )}
                 </div>
               ))}
@@ -341,18 +371,18 @@ export default function HCPDashboard() {
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-gray-900">{notification.title}</h3>
-                    <div className="flex items-center text-sm text-gray-500 mt-1">
+                    <div className="flex items-center text-sm text-gray-600 mt-1">
                       <Building className="w-4 h-4 mr-1" />
                       {notification.sender.companyName} • {notification.sender.contactName}
                     </div>
                   </div>
-                  <div className="flex items-center text-sm text-gray-400">
+                  <div className="flex items-center text-sm text-gray-600">
                     <Clock className="w-4 h-4 mr-1" />
                     {new Date(notification.createdAt).toLocaleDateString()}
                   </div>
                 </div>
                 
-                <p className="text-gray-700 mb-4">{notification.content}</p>
+                <p className="text-gray-800 mb-4">{notification.content}</p>
                 
                 {notification.drugInfo && (
                   <div className="bg-blue-50 rounded-lg p-3 mb-4">
@@ -362,7 +392,7 @@ export default function HCPDashboard() {
                 )}
 
                 <div className="flex justify-between items-center">
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-gray-700">
                     Target Species: {notification.targetSpecies.join(', ')}
                   </div>
                   <button
@@ -377,7 +407,7 @@ export default function HCPDashboard() {
             ))}
             
             {notifications.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-600">
                 No notifications yet. Check back later for updates from pharmaceutical companies.
               </div>
             )}
@@ -389,26 +419,71 @@ export default function HCPDashboard() {
           <div className="space-y-4">
             {savedDrugs.map((saved) => (
               <div key={saved.id} className="bg-white rounded-lg shadow p-6">
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start mb-4">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">{saved.drug.name}</h3>
                     {saved.drug.genericName && (
-                      <p className="text-gray-600">Generic: {saved.drug.genericName}</p>
+                      <p className="text-gray-700">Generic: {saved.drug.genericName}</p>
                     )}
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-600">
                       {saved.drug.manufacturer} • Saved on {new Date(saved.savedAt).toLocaleDateString()}
                     </p>
                   </div>
+                  <button
+                    onClick={() => unsaveDrug(saved.id)}
+                    disabled={removingDrug === saved.id}
+                    className={`flex items-center px-3 py-1 rounded-lg transition-colors ${
+                      removingDrug === saved.id 
+                        ? 'bg-gray-100 text-gray-500 cursor-not-allowed' 
+                        : 'bg-red-100 text-red-700 hover:bg-red-200'
+                    }`}
+                    title="Remove from saved drugs"
+                  >
+                    <X className="w-4 h-4 mr-1" />
+                    {removingDrug === saved.id ? 'Removing...' : 'Remove'}
+                  </button>
+                </div>
+                
+                {/* Drug Details */}
+                <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-800 mb-4">
+                  <div>
+                    <strong className="text-gray-900">Species:</strong> {(() => {
+                      try {
+                        return saved.drug.species ? JSON.parse(saved.drug.species).join(', ') : 'Not specified';
+                      } catch {
+                        return saved.drug.species || 'Not specified';
+                      }
+                    })()}
+                  </div>
+                  <div>
+                    <strong className="text-gray-900">Delivery:</strong> {(() => {
+                      try {
+                        return saved.drug.deliveryMethods ? JSON.parse(saved.drug.deliveryMethods).join(', ') : 'Not specified';
+                      } catch {
+                        return saved.drug.deliveryMethods || 'Not specified';
+                      }
+                    })()}
+                  </div>
+                  {saved.drug.dosage && (
+                    <div>
+                      <strong className="text-gray-900">Dosage:</strong> {saved.drug.dosage}
+                    </div>
+                  )}
+                  {saved.drug.withdrawalTime && (
+                    <div>
+                      <strong className="text-gray-900">Withdrawal:</strong> {saved.drug.withdrawalTime}
+                    </div>
+                  )}
                 </div>
                 
                 {saved.drug.description && (
-                  <p className="mt-3 text-gray-700">{saved.drug.description}</p>
+                  <p className="text-gray-800">{saved.drug.description}</p>
                 )}
               </div>
             ))}
             
             {savedDrugs.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-600">
                 No saved drugs yet. Start saving drugs from the Drug Database for quick reference.
               </div>
             )}

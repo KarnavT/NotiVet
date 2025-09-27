@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { hashPassword, generateToken } from '@/lib/auth'
 import { hcpRegistrationSchema } from '@/lib/validations'
-import { UserType } from '@prisma/client'
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,7 +30,7 @@ export async function POST(request: NextRequest) {
       data: {
         email: validatedData.email,
         password: hashedPassword,
-        userType: UserType.HCP,
+        userType: 'HCP',
         hcpProfile: {
           create: {
             firstName: validatedData.firstName,
@@ -43,7 +42,7 @@ export async function POST(request: NextRequest) {
             state: validatedData.state,
             zipCode: validatedData.zipCode,
             phone: validatedData.phone,
-            specialties: validatedData.specialties,
+            specialties: JSON.stringify(validatedData.specialties),
           }
         }
       },

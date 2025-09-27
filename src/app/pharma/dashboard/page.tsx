@@ -359,7 +359,7 @@ export default function PharmaDashboard() {
                         Target Species: {notification.targetSpecies.join(', ')}
                       </p>
                     </div>
-                    <div className="text-right text-sm text-gray-500">
+                    <div className="text-right text-sm text-gray-600">
                       <div className="flex items-center">
                         <Calendar className="w-4 h-4 mr-1" />
                         {new Date(notification.createdAt).toLocaleDateString()}
@@ -371,7 +371,7 @@ export default function PharmaDashboard() {
                     </div>
                   </div>
 
-                  <p className="text-gray-700 mb-4">{notification.content}</p>
+                  <p className="text-gray-800 mb-4">{notification.content}</p>
 
                   {notification.drugInfo && (
                     <div className="bg-green-50 rounded-lg p-3 mb-4">
@@ -381,7 +381,7 @@ export default function PharmaDashboard() {
                   )}
 
                   <div className="flex justify-between items-center pt-4 border-t">
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-700">
                       Opens: {notification.activities.filter(a => a.status === 'OPENED').length} • 
                       Clicks: {notification.activities.filter(a => a.status === 'CLICKED').length}
                     </div>
@@ -394,7 +394,7 @@ export default function PharmaDashboard() {
               ))}
 
               {notifications.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-gray-600">
                   No campaigns sent yet. Create your first notification campaign to reach veterinary professionals.
                 </div>
               )}
@@ -463,7 +463,7 @@ export default function PharmaDashboard() {
                     <div key={notification.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex-1">
                         <div className="font-medium">{notification.title}</div>
-                        <div className="text-sm text-gray-500">
+                        <div className="text-sm text-gray-700">
                           {notification.recipients} recipients • {notification.targetSpecies.join(', ')}
                         </div>
                       </div>
@@ -475,7 +475,7 @@ export default function PharmaDashboard() {
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500">No campaigns yet. Send your first campaign to see performance data.</p>
+                <p className="text-gray-600">No campaigns yet. Send your first campaign to see performance data.</p>
               )}
             </div>
           </div>
