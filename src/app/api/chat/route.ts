@@ -12,15 +12,60 @@ export const dynamic = 'force-dynamic'
 
 async function postChat(req: AuthenticatedRequest) {
   try {
-    const body = await req.json().catch(() => ({}))
-    const query = (body?.query || '').toString().trim()
-    const mode = (body?.mode || 'assistant') as 'assistant' | 'legacy'
+    const contentType = req.headers.get('content-type') || ''
+    let query = ''
+    let mode: 'assistant' | 'legacy' = 'assistant'
+
+    if (contentType.includes('multipart/form-data')) {
+      const form = await req.formData()
+      const modeVal = form.get('mode')
+      mode = ((modeVal ? String(modeVal) : 'assistant') as 'assistant' | 'legacy')
+
+      // Accept either "audio" or "file" field names
+      const file = form.get('audio') || form.get('file')
+      if (file && typeof file !== 'string') {
+        const OPENAI_API_KEY = process.env.OPENAI_API_KEY
+        if (!OPENAI_API_KEY) {
+          return NextResponse.json({ error: 'Missing OPENAI_API_KEY' }, { status: 500 })
+        }
+        // Forward the uploaded file to OpenAI Whisper for transcription
+        const fd = new FormData()
+        // @ts-ignore - Next.js provides a web File implementation compatible with fetch FormData
+        fd.append('file', file, (file as any)?.name || 'audio.webm')
+        fd.append('model', 'whisper-1')
+
+        const trRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
+          },
+          body: fd,
+        })
+
+        if (!trRes.ok) {
+          const errText = await trRes.text().catch(() => '')
+          console.error('Transcription error:', trRes.status, errText)
+          return NextResponse.json({ error: 'Transcription failed' }, { status: 502 })
+        }
+        const trJson = await trRes.json().catch(() => ({} as any))
+        query = (trJson?.text || '').toString().trim()
+        if (!query) {
+          return NextResponse.json({ error: 'Empty transcription' }, { status: 400 })
+        }
+      } else {
+        query = (form.get('query') || '').toString().trim()
+      }
+    } else {
+      const body = await req.json().catch(() => ({}))
+      query = (body?.query || '').toString().trim()
+      mode = (body?.mode || 'assistant') as 'assistant' | 'legacy'
+    }
+
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
     if (!query) {
       return NextResponse.json({ error: 'Query is required' }, { status: 400 })
     }
-
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 
     // Tokenize query for broader matching (e.g., trade names, species, indications)
     const tokens: string[] = Array.from(
@@ -319,7 +364,6 @@ Use the provided drug database excerpts to answer the user's question.
 
       const userContent = `User question:\n${query}\n\nDrug database excerpts:\n${contextText || '(No directly matching entries found; answer based on general guidance.)'}`
 
-      const OPENAI_API_KEY = process.env.OPENAI_API_KEY
       if (!OPENAI_API_KEY) {
         // Fallback: return a minimal list + context-derived snippet
         const parsedFallback = drugs.slice(0, 3).map((d) => ({
@@ -335,6 +379,7 @@ Use the provided drug database excerpts to answer the user's question.
           answer: list ? `I've found ${parsedFallback.length} drugs that match your criteria: ${list}` : 'No direct matches found.',
           sources: parsedFallback.map((d) => d.name),
           matchedDrugs: parsedFallback,
+          transcript: query,
         })
       }
 
@@ -385,6 +430,7 @@ Use the provided drug database excerpts to answer the user's question.
         answer: answerLegacy,
         sources: parsedLegacy.map((d) => d.tradeName || d.name).filter(Boolean),
         matchedDrugs: parsedLegacy,
+        transcript: query,
       })
     }
 
@@ -395,7 +441,7 @@ Use the provided drug database excerpts to answer the user's question.
     if (parsed.length > 1 || !matchesNameInQuery) {
       const list = parsed.map((d) => `- ${d.name}${d.genericName ? ` (${d.genericName})` : ''}`).join('\n')
       const answer = `I've found ${parsed.length} drugs that match your criteria:\n${list}`
-      return NextResponse.json({ answer, matchedDrugs: parsed })
+      return NextResponse.json({ answer, matchedDrugs: parsed, transcript: query })
     }
 
     // Specific-drug concise answer: prefer OpenAI if available, else synthesize from fields
@@ -408,7 +454,7 @@ Use the provided drug database excerpts to answer the user's question.
         top.contraindications ? `Contraindications: ${top.contraindications}` : undefined,
       ].filter(Boolean)
       const answer = [`${top.name}${top.genericName ? ` (${top.genericName})` : ''}`, ...bullets].map(b => `- ${b}`).join('\n')
-      return NextResponse.json({ answer, matchedDrugs: parsed })
+      return NextResponse.json({ answer, matchedDrugs: parsed, transcript: query })
     }
 
     const contextText = parsed
@@ -458,7 +504,7 @@ Use the provided drug database excerpts to answer the user's question.
     // Sanitize simple markdown that might slip through
     answer = answer.replace(/\*\*(.*?)\*\*/g, '$1').replace(/`+/g, '').replace(/\*\*/g, '')
 
-    return NextResponse.json({ answer, matchedDrugs: parsed })
+    return NextResponse.json({ answer, matchedDrugs: parsed, transcript: query })
   } catch (error) {
     console.error('Chat error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
