@@ -14,18 +14,13 @@ async function postChat(req: AuthenticatedRequest) {
   try {
     const body = await req.json().catch(() => ({}))
     const query = (body?.query || '').toString().trim()
+    const mode = (body?.mode || 'assistant') as 'assistant' | 'legacy'
 
     if (!query) {
       return NextResponse.json({ error: 'Query is required' }, { status: 400 })
     }
 
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY
-    if (!OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: 'AI Assistant is not configured on this deployment. Please set OPENAI_API_KEY on the server.' },
-        { status: 503 }
-      )
-    }
 
     // Tokenize query for broader matching (e.g., trade names, species, indications)
     const tokens: string[] = Array.from(
@@ -51,6 +46,10 @@ async function postChat(req: AuthenticatedRequest) {
       bovine: 'BOVINE',
       bovines: 'BOVINE',
       cattle: 'BOVINE',
+      cow: 'BOVINE',
+      cows: 'BOVINE',
+      calf: 'BOVINE',
+      calves: 'BOVINE',
       equine: 'EQUINE',
       equines: 'EQUINE',
       horse: 'EQUINE',
@@ -89,6 +88,21 @@ async function postChat(req: AuthenticatedRequest) {
     const speciesTokens = tokens
       .map((t) => getSpeciesEnum(t))
       .filter((t): t is string => Boolean(t))
+
+    // Extra guard: detect plain-language species words in the raw query
+    // (covers phrases like "treat the cows", "for calves")
+    const forcedSpecies = (() => {
+      const q = query.toLowerCase()
+      if (/(\bcow\b|\bcows\b|\bcattle\b|\bcalf\b|\bcalves\b)/.test(q)) return 'BOVINE'
+      if (/(\bdog\b|\bdogs\b|\bcanine\b|\bcanines\b)/.test(q)) return 'CANINE'
+      if (/(\bcat\b|\bcats\b|\bfeline\b|\bfelines\b)/.test(q)) return 'FELINE'
+      if (/(\bhorse\b|\bhorses\b|\bequine\b|\bequines\b)/.test(q)) return 'EQUINE'
+      if (/(\bsheep\b|\bovine\b|\bovines\b)/.test(q)) return 'OVINE'
+      if (/(\bgoat\b|\bgoats\b|\bcaprine\b|\bcaprines\b)/.test(q)) return 'CAPRINE'
+      if (/(\bswine\b|\bpig\b|\bpigs\b|\bporcine\b|\bporcines\b)/.test(q)) return 'PORCINE'
+      if (/(\bbird\b|\bbirds\b|\bpoultry\b|\bavian\b)/.test(q)) return 'AVIAN'
+      return undefined
+    })()
 
     // Build a Prisma where with AND of ORs: each token must match some field
     const orFieldsForToken = (t: string) => ({
@@ -181,8 +195,8 @@ async function postChat(req: AuthenticatedRequest) {
     const brandTokens = tokens.filter((t) => !stopWords.has(t))
 
     // If user specified species, restrict candidates to those species; if none remain, return empty
-    if (Array.isArray(drugs) && drugs.length > 0 && speciesTokens.length > 0) {
-      const speciesSet = new Set(speciesTokens)
+    if (Array.isArray(drugs) && drugs.length > 0 && (speciesTokens.length > 0 || forcedSpecies)) {
+      const speciesSet = new Set([...(speciesTokens || []), ...(forcedSpecies ? [forcedSpecies] : [])])
       drugs = drugs.filter((d) => {
         try {
           const arr = d.species ? JSON.parse(d.species) : []
@@ -230,7 +244,7 @@ async function postChat(req: AuthenticatedRequest) {
       }
     }
 
-    const parsed = drugs.map((d) => ({
+    let parsed = drugs.map((d) => ({
       id: String(d.id),
       name: d.name,
       genericName: d.genericName || undefined,
@@ -248,7 +262,130 @@ async function postChat(req: AuthenticatedRequest) {
       withdrawalTime: truncate(d.withdrawalTime, 120),
     }))
 
-    const sourcesText = parsed
+    // Final safety: enforce species filter on the parsed list as well
+    if ((speciesTokens.length > 0 || forcedSpecies) && parsed.length > 0) {
+      const speciesSet2 = new Set([...(speciesTokens || []), ...(forcedSpecies ? [forcedSpecies] : [])])
+      parsed = parsed.filter((d) => {
+        try {
+          const arr = Array.isArray(d.species) ? d.species : []
+          return arr.some((s: string) => speciesSet2.has(s))
+        } catch {
+          return false
+        }
+      })
+    }
+
+    // If legacy mode requested, use the previous prompt/format with sources
+    if (mode === 'legacy') {
+      // Compose context
+      const contextText = drugs.map((d) => {
+        const speciesArr = d.species ? JSON.parse(d.species as any as string) : []
+        return `${d.name} | ${d.genericName || ''} | ${d.manufacturer} | ${d.activeIngredient} | Species: ${Array.isArray(speciesArr) ? speciesArr.join(', ') : ''}`
+      }).join('\n')
+
+      const systemPrompt = `You are NotiVet, a veterinary drug assistant for licensed HCPs and Pharmaceutical companies. This the primary goal of NotiVet: The purpose of the veterinary pharma app is to connect pharmaceutical companies and veterinarians in a seamless platform that delivers timely drug updates, personalized dosing guidance, and species-specific medication information. It enhances veterinary care by providing easy access to relevant drug data, smart notifications, and AI support, enabling better treatment decisions and improved animal health outcomes. This app also streamlines communication and helps identify cost-effective or more effective drug options, supporting efficient and evidence-based veterinary practice.
+Use the provided drug database excerpts to answer the user's question.
+- Be concise and clinically helpful.
+- Prefer authoritative info from the provided sources.
+- If unavailable in sources, clearly say you are uncertain (but do NOT say go to a veterinary pharmacology reference or veterinary professionals).
+- Include species-appropriateness and safety when relevant.
+- Do not fabricate data or dosing that isn't in the sources.`
+
+      const userContent = `User question:\n${query}\n\nDrug database excerpts:\n${contextText || '(No directly matching entries found; answer based on general guidance.)'}`
+
+      const OPENAI_API_KEY = process.env.OPENAI_API_KEY
+      if (!OPENAI_API_KEY) {
+        // Fallback: return a minimal list + context-derived snippet
+        const parsedFallback = drugs.slice(0, 3).map((d) => ({
+          id: String(d.id),
+          name: d.name,
+          manufacturer: d.manufacturer,
+          activeIngredient: d.activeIngredient,
+          species: d.species ? JSON.parse(d.species) : [],
+          deliveryMethods: d.deliveryMethods ? JSON.parse(d.deliveryMethods) : [],
+        }))
+        const list = parsedFallback.map((d) => d.name).join(', ')
+        return NextResponse.json({
+          answer: list ? `I've found ${parsedFallback.length} drugs that match your criteria: ${list}` : 'No direct matches found.',
+          sources: parsedFallback.map((d) => d.name),
+          matchedDrugs: parsedFallback,
+        })
+      }
+
+      const completionRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          temperature: 0.2,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userContent },
+          ],
+        }),
+      })
+
+      if (!completionRes.ok) {
+        const errText = await completionRes.text().catch(() => '')
+        console.error('OpenAI error:', completionRes.status, errText)
+        return NextResponse.json({ error: 'LLM request failed' }, { status: 502 })
+      }
+
+      const completionJson = await completionRes.json()
+      const answerLegacy = completionJson?.choices?.[0]?.message?.content || ''
+
+      const parsedLegacy = drugs.map((d) => ({
+        id: String(d.id),
+        name: d.name,
+        genericName: d.genericName || undefined,
+        manufacturer: d.manufacturer,
+        activeIngredient: d.activeIngredient,
+        tradeName: d.tradeName || undefined,
+        productCode: d.productCode || undefined,
+        species: d.species ? JSON.parse(d.species) : [],
+        deliveryMethods: d.deliveryMethods ? JSON.parse(d.deliveryMethods) : [],
+        description: truncate(d.description, 400),
+        dosage: truncate(d.dosage, 300),
+        contraindications: truncate(d.contraindications, 300),
+        warnings: truncate(d.warnings, 300),
+        faradInfo: truncate(d.faradInfo, 200),
+        withdrawalTime: truncate(d.withdrawalTime, 120),
+      }))
+
+      return NextResponse.json({
+        answer: answerLegacy,
+        sources: parsedLegacy.map((d) => d.tradeName || d.name).filter(Boolean),
+        matchedDrugs: parsedLegacy,
+      })
+    }
+
+    // If it's clearly a list search or multiple matches, return a compact list response
+    const normalize2 = (s: string | null | undefined) => (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
+    const normalizedQuery2 = normalize2(query)
+    const matchesNameInQuery = parsed.some((d) => normalize2(d.name) && normalizedQuery2.includes(normalize2(d.name)))
+    if (parsed.length > 1 || !matchesNameInQuery) {
+      const list = parsed.map((d) => `- ${d.name}${d.genericName ? ` (${d.genericName})` : ''}`).join('\n')
+      const answer = `I've found ${parsed.length} drugs that match your criteria:\n${list}`
+      return NextResponse.json({ answer, matchedDrugs: parsed })
+    }
+
+    // Specific-drug concise answer: prefer OpenAI if available, else synthesize from fields
+    if (!OPENAI_API_KEY) {
+      const top = parsed[0]
+      const bullets = [
+        top.description ? `Use/notes: ${top.description}` : undefined,
+        top.dosage ? `Dosage: ${top.dosage}` : undefined,
+        top.warnings ? `Warnings: ${top.warnings}` : undefined,
+        top.contraindications ? `Contraindications: ${top.contraindications}` : undefined,
+      ].filter(Boolean)
+      const answer = [`${top.name}${top.genericName ? ` (${top.genericName})` : ''}`, ...bullets].map(b => `- ${b}`).join('\n')
+      return NextResponse.json({ answer, matchedDrugs: parsed })
+    }
+
+    const contextText = parsed
       .map((d, i) =>
         `Source ${i + 1} - ${d.name}${d.genericName ? ` (Generic: ${d.genericName})` : ''}${d.tradeName ? ` | Trade: ${d.tradeName}` : ''}${d.productCode ? ` | Code: ${d.productCode}` : ''}\n` +
         `Manufacturer: ${d.manufacturer}\nActive Ingredient: ${d.activeIngredient}\n` +
@@ -262,17 +399,11 @@ async function postChat(req: AuthenticatedRequest) {
       )
       .join('\n---\n')
 
-    const systemPrompt = `You are NotiVet, a veterinary drug assistant for licensed HCPs and Pharmaceutical companies. This the primary goal of NotiVet: The purpose of the veterinary pharma app is to connect pharmaceutical companies and veterinarians in a seamless platform that delivers timely drug updates, personalized dosing guidance, and species-specific medication information. It enhances veterinary care by providing easy access to relevant drug data, smart notifications, and AI support, enabling better treatment decisions and improved animal health outcomes. This app also streamlines communication and helps identify cost-effective or more effective drug options, supporting efficient and evidence-based veterinary practice.
-Use the provided drug database excerpts to answer the user's question.
-- Be concise and clinically helpful.
-- Prefer authoritative info from the provided sources.
-- If unavailable in sources, clearly say you are uncertain (but do NOT say go to a veterinary pharmacology reference or veterinary professionals).
-- Include species-appropriateness and safety when relevant.
-- Do not fabricate data or dosing that isn't in the sources.`
+    const systemPrompt = `You are NotiVet, a veterinary drug assistant. Answer precisely and concisely in 3-6 short bullet points.\n- Output must be plain text, no Markdown, no bold or italics.\n- Each bullet MUST start with "- ".\n- If the user is asking about a specific drug, summarize key points (use, dosage if available, key warnings/safety, species fit).\n- Do not include a Sources section or any extra commentary.\n- Do not fabricate data.`
 
-    const userContent = `User question:\n${query}\n\nDrug database excerpts:\n${sourcesText || '(No directly matching entries found; answer based on general guidance and recommend checking database.)'}`
+    const userContent = `User question:\n${query}\n\nDrug database excerpts:\n${contextText || '(No matching excerpts)'}
+`
 
-    // Call OpenAI Chat Completions with GPT-4o
     const completionRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -296,13 +427,12 @@ Use the provided drug database excerpts to answer the user's question.
     }
 
     const completionJson = await completionRes.json()
-    const answer = completionJson?.choices?.[0]?.message?.content || ''
+    let answer = completionJson?.choices?.[0]?.message?.content || ''
 
-    return NextResponse.json({
-      answer,
-      sources: parsed.map((d) => d.tradeName || d.name).filter(Boolean),
-      matchedDrugs: parsed,
-    })
+    // Sanitize simple markdown that might slip through
+    answer = answer.replace(/\*\*(.*?)\*\*/g, '$1').replace(/`+/g, '').replace(/\*\*/g, '')
+
+    return NextResponse.json({ answer, matchedDrugs: parsed })
   } catch (error) {
     console.error('Chat error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
