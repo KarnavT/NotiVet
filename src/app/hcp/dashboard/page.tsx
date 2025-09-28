@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   Search, 
@@ -74,6 +74,9 @@ export default function HCPDashboard() {
   const [chatbotSources, setChatbotSources] = useState<string[]>([])
   const [chatbotError, setChatbotError] = useState('')
   const [chatbotMatchedDrugs, setChatbotMatchedDrugs] = useState<Drug[]>([])
+  // Speech-to-text state
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const [isRecording, setIsRecording] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [removingDrug, setRemovingDrug] = useState<string | null>(null)
@@ -276,6 +279,74 @@ export default function HCPDashboard() {
       }
     } finally {
       setAiAssistantLoading(false)
+    }
+  }
+
+  // Upload audio blob to /api/chat for transcription + answer (legacy mode)
+  const uploadAudioToChat = async (blob: Blob) => {
+    setChatbotLoading(true)
+    setChatbotAnswer('')
+    setChatbotSources([])
+    setChatbotError('')
+    try {
+      const fd = new FormData()
+      fd.append('mode', 'legacy')
+      fd.append('audio', blob, 'speech.webm')
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token') || ''}` },
+        body: fd,
+      })
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.error || 'Transcription failed')
+      }
+      const data = await response.json()
+      setChatbotAnswer(data.answer || '')
+      setChatbotSources(data.sources || [])
+      setChatbotMatchedDrugs(Array.isArray(data.matchedDrugs) ? data.matchedDrugs as any : [])
+      if (typeof data.transcript === 'string') {
+        setChatbotInput(data.transcript)
+      }
+    } catch (e: any) {
+      setChatbotError(e?.message || 'Voice request failed')
+    } finally {
+      setChatbotLoading(false)
+    }
+  }
+
+  // Start/stop voice recording
+  const toggleRecording = async () => {
+    try {
+      if (typeof window === 'undefined' || typeof (window as any).MediaRecorder === 'undefined') {
+        setChatbotError('Voice recording not supported in this browser')
+        return
+      }
+      if (!isRecording) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        const rec = new MediaRecorder(stream)
+        const chunks: BlobPart[] = []
+        rec.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data) }
+        rec.onstop = async () => {
+          const blob = new Blob(chunks, { type: 'audio/webm' })
+          // Stop all tracks to release the mic
+          stream.getTracks().forEach(t => t.stop())
+          await uploadAudioToChat(blob)
+        }
+        mediaRecorderRef.current = rec
+        setIsRecording(true)
+        rec.start()
+      } else {
+        const rec = mediaRecorderRef.current
+        if (rec && rec.state !== 'inactive') {
+          rec.stop()
+        }
+        setIsRecording(false)
+      }
+    } catch (e) {
+      console.error('Mic error', e)
+      setChatbotError('Microphone access denied or unsupported browser')
+      setIsRecording(false)
     }
   }
 
@@ -673,6 +744,14 @@ export default function HCPDashboard() {
                     }`}
                   >
                     {chatbotLoading ? 'Asking…' : 'Ask ScoobyAI'}
+                  </button>
+                  <button
+                    onClick={toggleRecording}
+                    className={`flex-1 px-6 py-3 rounded-xl font-medium shadow-md transition-all duration-200 ${
+                      isRecording ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    }`}
+                  >
+                    {isRecording ? 'Stop & Transcribe' : 'Speak to Ask'}
                   </button>
                   {chatbotInput && (
                     <button
