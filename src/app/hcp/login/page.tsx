@@ -18,6 +18,10 @@ export default function HCPLogin() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Prevent multiple submissions
+    if (loading) return
+    
     setLoading(true)
     setError('')
 
@@ -38,15 +42,18 @@ export default function HCPLogin() {
       if (response.ok) {
         localStorage.setItem('token', data.token)
         localStorage.setItem('user', JSON.stringify(data.user))
-        router.push('/hcp/dashboard')
+        // Use replace instead of push to avoid back button issues
+        router.replace('/hcp/dashboard')
       } else {
         setError(data.error || 'Login failed')
+        setLoading(false)
       }
     } catch (err) {
       setError('Network error. Please try again.')
-    } finally {
       setLoading(false)
     }
+    // Note: Don't set loading to false in finally when login is successful
+    // to prevent race conditions with navigation
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

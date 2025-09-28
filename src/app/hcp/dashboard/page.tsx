@@ -62,7 +62,9 @@ export default function HCPDashboard() {
   const [totalDrugsCount, setTotalDrugsCount] = useState(0)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [savedDrugs, setSavedDrugs] = useState<any[]>([])
+  const [filteredSavedDrugs, setFilteredSavedDrugs] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+  const [savedSearchQuery, setSavedSearchQuery] = useState('')
   const [chatbotInput, setChatbotInput] = useState('')
   const [chatbotLoading, setChatbotLoading] = useState(false)
   const [chatbotAnswer, setChatbotAnswer] = useState('')
@@ -107,6 +109,40 @@ export default function HCPDashboard() {
     } catch {}
   }, [])
 
+  // Filter saved drugs when search query changes
+  useEffect(() => {
+    if (!savedSearchQuery.trim()) {
+      setFilteredSavedDrugs(savedDrugs)
+    } else {
+      const query = savedSearchQuery.toLowerCase()
+      const filtered = savedDrugs.filter(saved => {
+        const drug = saved.drug
+        return (
+          drug.name.toLowerCase().includes(query) ||
+          drug.genericName?.toLowerCase().includes(query) ||
+          drug.manufacturer.toLowerCase().includes(query) ||
+          drug.activeIngredient.toLowerCase().includes(query) ||
+          (drug.description && drug.description.toLowerCase().includes(query)) ||
+          ((drug as any).usage && (drug as any).usage.toLowerCase().includes(query))
+        )
+      })
+      setFilteredSavedDrugs(filtered)
+    }
+  }, [savedDrugs, savedSearchQuery])
+
+  // Real-time search for drug database with debouncing
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      if (searchQuery.trim()) {
+        handleSearch(searchQuery)
+      } else {
+        loadData() // Load all drugs when search is cleared
+      }
+    }, 300) // 300ms debounce delay
+
+    return () => clearTimeout(debounceTimer)
+  }, [searchQuery])
+
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token')
     return {
@@ -144,6 +180,7 @@ export default function HCPDashboard() {
         const savedData = await savedResponse.json()
         const savedDrugsList = savedData.savedDrugs || []
         setSavedDrugs(savedDrugsList)
+        setFilteredSavedDrugs(savedDrugsList)
         // Update the set of saved drug IDs
         const drugIds = new Set<string>(savedDrugsList.map((saved: any) => saved.drug.id as string))
         setSavedDrugIds(drugIds)
@@ -162,15 +199,15 @@ export default function HCPDashboard() {
     }
   }
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
+  const handleSearch = async (query: string = searchQuery) => {
+    if (!query.trim()) {
       loadData()
       return
     }
 
     setLoading(true)
     try {
-      const response = await fetch(`/api/drugs?q=${encodeURIComponent(searchQuery)}`, {
+      const response = await fetch(`/api/drugs?q=${encodeURIComponent(query)}`, {
         headers: getAuthHeaders()
       })
       
@@ -493,7 +530,7 @@ export default function HCPDashboard() {
         {/* Drug Database Tab */}
         {activeTab === 'drugs' && (
           <div className="space-y-6">
-            {/* Search */}
+            {/* Search Bar for Drug Database */}
             <div className="flex space-x-4">
               <div className="flex-1 relative">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-blue-400" />
@@ -503,17 +540,32 @@ export default function HCPDashboard() {
                   className="w-full pl-12 pr-4 py-3 border-2 border-blue-100 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200 text-gray-900 placeholder-gray-500 shadow-sm hover:shadow-md"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 />
+                {loading && (
+                  <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                    <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                  </div>
+                )}
               </div>
-              <button
-                onClick={handleSearch}
-                disabled={loading}
-                className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg font-medium"
-              >
-                {loading ? 'Searching...' : 'Search'}
-              </button>
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="px-6 py-3 bg-gray-600 text-white rounded-xl hover:bg-gray-700 transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg font-medium"
+                >
+                  Clear
+                </button>
+              )}
             </div>
+            
+            {/* Results Info */}
+            {searchQuery && (
+              <div className="text-sm text-gray-600">
+                {drugs.length > 0 
+                  ? `Found ${drugs.length} drug${drugs.length !== 1 ? 's' : ''} matching "${searchQuery}"`
+                  : `No drugs found matching "${searchQuery}"`
+                }
+              </div>
+            )}
 
             {/* Drug Results */}
             <div className="grid gap-6">
@@ -747,117 +799,62 @@ export default function HCPDashboard() {
 
         {/* Saved Drugs Tab */}
         {activeTab === 'saved' && (
-          <div className="space-y-4">
-            {savedDrugs.map((saved) => (
-              <div key={saved.id} className="group bg-white rounded-xl border-2 border-emerald-100 hover:border-emerald-300 shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out transform hover:-translate-y-1 p-6">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center mb-2">
-                      <Heart className="w-5 h-5 text-emerald-500 mr-2 fill-current" />
-                      <h3 className="text-lg font-bold text-gray-900 group-hover:text-emerald-900 transition-colors duration-200">{saved.drug.name}</h3>
-                    </div>
-                    {saved.drug.genericName && (
-                      <p className="text-gray-600 font-medium">Generic: <span className="text-gray-700">{saved.drug.genericName}</span></p>
-                    )}
-                    <div className="space-y-1 mt-2">
-                      <div className="flex items-center text-sm text-gray-500">
-                        <div className="w-2 h-2 bg-emerald-400 rounded-full mr-2"></div>
-                        <span className="font-medium text-gray-600">Manufacturer:</span> {saved.drug.manufacturer}
-                      </div>
-                      {saved.drug.activeIngredient && (
-                        <div className="flex items-start text-sm text-gray-500">
-                          <div className="w-2 h-2 bg-purple-400 rounded-full mr-2 mt-1.5 flex-shrink-0"></div>
-                          <div>
-                            <span className="font-medium text-gray-600">Active Ingredient:</span> {saved.drug.activeIngredient}
-                          </div>
-                        </div>
-                      )}
-                      <div className="flex items-center text-sm text-gray-500">
-                        <div className="w-2 h-2 bg-blue-400 rounded-full mr-2"></div>
-                        Saved {new Date(saved.savedAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => unsaveDrug(saved.id)}
-                    disabled={removingDrug === saved.id}
-                    className={`flex items-center px-4 py-2 rounded-lg transition-all duration-200 transform hover:scale-105 ${
-                      removingDrug === saved.id 
-                        ? 'bg-gray-100 text-gray-500 cursor-not-allowed' 
-                        : 'bg-red-600 text-white hover:bg-red-700 shadow-md hover:shadow-lg'
-                    }`}
-                    title="Remove from saved drugs"
-                  >
-                    <X className="w-4 h-4 mr-2 transition-transform duration-200 hover:rotate-90" />
-                    {removingDrug === saved.id ? 'Removing...' : 'Remove'}
-                  </button>
-                </div>
-                
-                {/* Drug Details */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium text-gray-700 mr-3">Species:</span>
-                      <SpeciesIcons 
-                        species={saved.drug.species || []} 
-                        size="md" 
-                        className="flex-wrap"
-                      />
-                    </div>
-                    <span className="text-xs text-gray-500 font-medium">
-                      ({(() => {
-                        try {
-                          return saved.drug.species ? JSON.parse(saved.drug.species).join(', ') : 'Not specified';
-                        } catch {
-                          return saved.drug.species || 'Not specified';
-                        }
-                      })()})
-                    </span>
-                  </div>
-                  
-                  {saved.drug.dosage && (
-                    <div className="bg-gray-50 rounded-lg p-3 border-l-4 border-emerald-400">
-                      <div className="flex items-start">
-                        <div className="flex-shrink-0">
-                          <div className="w-2 h-2 bg-emerald-500 rounded-full mt-2"></div>
-                        </div>
-                        <div className="ml-3">
-                          <p className="text-sm font-medium text-gray-900">Dosage</p>
-                          <p className="text-sm text-gray-700">{saved.drug.dosage}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {saved.drug.withdrawalTime && (
-                    <div className="bg-amber-50 rounded-lg p-3 border-l-4 border-amber-400">
-                      <div className="flex items-start">
-                        <div className="flex-shrink-0">
-                          <div className="w-2 h-2 bg-amber-500 rounded-full mt-2"></div>
-                        </div>
-                        <div className="ml-3">
-                          <p className="text-sm font-medium text-gray-900">Withdrawal Time</p>
-                          <p className="text-sm text-gray-700">{saved.drug.withdrawalTime}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                
-                {((saved.drug as any).usage || saved.drug.description) && (
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <div className="mb-2">
-                      <span className="text-sm font-medium text-gray-900">Description:</span>
-                    </div>
-                    <p className="text-gray-700 leading-relaxed">{(saved.drug as any).usage || saved.drug.description}</p>
-                  </div>
-                )}
+          <div className="space-y-6">
+            {/* Search Bar for Saved Drugs */}
+            <div className="flex space-x-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-emerald-400" />
+                <input
+                  type="text"
+                  placeholder="Search your saved drugs by name, active ingredient, or manufacturer..."
+                  className="w-full pl-12 pr-4 py-3 border-2 border-emerald-100 rounded-xl focus:ring-4 focus:ring-emerald-100 focus:border-emerald-300 transition-all duration-200 text-gray-900 placeholder-gray-500 shadow-sm hover:shadow-md"
+                  value={savedSearchQuery}
+                  onChange={(e) => setSavedSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && e.preventDefault()}
+                />
               </div>
+              {savedSearchQuery && (
+                <button
+                  onClick={() => setSavedSearchQuery('')}
+                  className="px-6 py-3 bg-gray-600 text-white rounded-xl hover:bg-gray-700 transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg font-medium"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            
+            {/* Results Info */}
+            {savedSearchQuery && (
+              <div className="text-sm text-gray-600">
+                {filteredSavedDrugs.length > 0 
+                  ? `Found ${filteredSavedDrugs.length} saved drug${filteredSavedDrugs.length !== 1 ? 's' : ''} matching "${savedSearchQuery}"`
+                  : `No saved drugs found matching "${savedSearchQuery}"`
+                }
+              </div>
+            )}
+            
+            {/* Drug Cards */}
+            {filteredSavedDrugs.map((saved) => (
+              <DrugCard
+                key={saved.id}
+                drug={saved.drug as any}
+                saved={true}
+                onSave={() => {}}
+                onUnsave={() => unsaveDrug(saved.id)}
+                context="saved"
+                isRemoving={removingDrug === saved.id}
+              />
             ))}
             
             {savedDrugs.length === 0 && (
               <div className="text-center py-8 text-gray-600">
                 No saved drugs yet. Start saving drugs from the Drug Database for quick reference.
+              </div>
+            )}
+            
+            {savedDrugs.length > 0 && filteredSavedDrugs.length === 0 && savedSearchQuery && (
+              <div className="text-center py-8 text-gray-600">
+                No saved drugs match your search criteria. Try a different search term.
               </div>
             )}
           </div>

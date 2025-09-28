@@ -1,5 +1,5 @@
 import React from 'react'
-import { Heart, Check, MessageSquare } from 'lucide-react'
+import { Heart, Check, MessageSquare, X } from 'lucide-react'
 import SpeciesIcons from './SpeciesIcons'
 
 export type DrugCardDrug = {
@@ -19,17 +19,21 @@ interface DrugCardProps {
   drug: DrugCardDrug
   saved: boolean
   onSave: () => void
-  context?: 'database' | 'chatbot'
+  onUnsave?: () => void
+  context?: 'database' | 'chatbot' | 'saved'
+  isRemoving?: boolean
 }
 
-export default function DrugCard({ drug, saved, onSave, context = 'database' }: DrugCardProps) {
+export default function DrugCard({ drug, saved, onSave, onUnsave, context = 'database', isRemoving = false }: DrugCardProps) {
   const speciesText = Array.isArray((drug as any).species)
     ? ((drug as any).species as string[]).join(', ')
     : (drug as any).species || ''
 
   return (
     <div className={`group bg-white rounded-xl border-2 ${
-      context === 'database' ? 'border-blue-100 hover:border-blue-300' : 'border-indigo-100 hover:border-indigo-300'
+      context === 'database' ? 'border-blue-100 hover:border-blue-300' : 
+      context === 'saved' ? 'border-emerald-100 hover:border-emerald-300' :
+      'border-indigo-100 hover:border-indigo-300'
     } shadow-sm hover:shadow-lg transition-all duration-300 ease-in-out transform hover:-translate-y-1 p-6`}>
       
       {/* Header Section with Title and Manufacturer */}
@@ -107,24 +111,42 @@ export default function DrugCard({ drug, saved, onSave, context = 'database' }: 
 
         {/* Action Buttons Section */}
         <div className="flex flex-col gap-3 min-w-[130px] max-w-[130px] flex-shrink-0">
-          {/* Save Button */}
-          <button
-            type="button"
-            onClick={() => !saved && onSave()}
-            disabled={saved}
-            className={`flex items-center justify-center px-4 py-2.5 rounded-lg transition-all duration-300 shadow-md text-sm font-medium ${
-              saved 
-                ? 'bg-green-600 text-white cursor-default shadow-green-200' 
-                : 'bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-105 hover:shadow-lg shadow-blue-200'
-            }`}
-          >
-            {saved ? (
-              <Check className="w-4 h-4 mr-2 transition-all duration-300 scale-110" />
-            ) : (
-              <Heart className="w-4 h-4 mr-2 transition-all duration-300 group-hover:scale-110" />
-            )}
-            {saved ? 'Saved!' : 'Save'}
-          </button>
+          {context === 'saved' ? (
+            /* Unsave Button for saved drugs */
+            <button
+              type="button"
+              onClick={onUnsave}
+              disabled={isRemoving}
+              className={`flex items-center justify-center px-4 py-2.5 rounded-lg transition-all duration-300 shadow-md text-sm font-medium ${
+                isRemoving 
+                  ? 'bg-gray-100 text-gray-500 cursor-not-allowed' 
+                  : 'bg-red-600 text-white hover:bg-red-700 transform hover:scale-105 hover:shadow-lg shadow-red-200'
+              }`}
+              title="Remove from saved drugs"
+            >
+              <X className="w-4 h-4 mr-2 transition-all duration-300 group-hover:scale-110" />
+              {isRemoving ? 'Removing...' : 'Remove'}
+            </button>
+          ) : (
+            /* Save Button for database/chatbot drugs */
+            <button
+              type="button"
+              onClick={() => !saved && onSave()}
+              disabled={saved}
+              className={`flex items-center justify-center px-4 py-2.5 rounded-lg transition-all duration-300 shadow-md text-sm font-medium ${
+                saved 
+                  ? 'bg-green-600 text-white cursor-default shadow-green-200' 
+                  : 'bg-blue-600 hover:bg-blue-700 text-white transform hover:scale-105 hover:shadow-lg shadow-blue-200'
+              }`}
+            >
+              {saved ? (
+                <Check className="w-4 h-4 mr-2 transition-all duration-300 scale-110" />
+              ) : (
+                <Heart className="w-4 h-4 mr-2 transition-all duration-300 group-hover:scale-110" />
+              )}
+              {saved ? 'Saved!' : 'Save'}
+            </button>
+          )}
 
           {/* Contact Button */}
           <button
