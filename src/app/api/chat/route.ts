@@ -20,12 +20,6 @@ async function postChat(req: AuthenticatedRequest) {
     }
 
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY
-    if (!OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: 'AI Assistant is not configured on this deployment. Please set OPENAI_API_KEY on the server.' },
-        { status: 503 }
-      )
-    }
 
     // Tokenize query for broader matching (e.g., trade names, species, indications)
     const tokens: string[] = Array.from(
@@ -248,6 +242,31 @@ async function postChat(req: AuthenticatedRequest) {
       withdrawalTime: truncate(d.withdrawalTime, 120),
     }))
 
+    // Decide if this looks like a general search (list drugs) or a specific drug question
+    const namesLower = drugs.map((d) => (d.name || '').toLowerCase())
+    const matchesNameInQuery = namesLower.some((n) => normalizedQuery.includes(n))
+    const isSearchList = drugs.length > 1 || !matchesNameInQuery
+
+    if (isSearchList) {
+      const list = parsed.map((d) => `- ${d.name}${d.genericName ? ` (${d.genericName})` : ''}`).join('\n')
+      const answer = `I've found ${parsed.length} drugs that match your criteria:\n${list}`
+      return NextResponse.json({ answer, matchedDrugs: parsed })
+    }
+
+    // For specific drug questions, optionally use OpenAI if configured to craft a concise answer
+    if (!OPENAI_API_KEY) {
+      // Fallback concise answer from top match if no API key
+      const top = parsed[0]
+      const bullets = [
+        top.description ? `Use/notes: ${top.description}` : undefined,
+        top.dosage ? `Dosage: ${top.dosage}` : undefined,
+        top.warnings ? `Warnings: ${top.warnings}` : undefined,
+        top.contraindications ? `Contraindications: ${top.contraindications}` : undefined,
+      ].filter(Boolean)
+      const answer = [`${top.name}${top.genericName ? ` (${top.genericName})` : ''}`, ...bullets].map(b => `- ${b}`).join('\n')
+      return NextResponse.json({ answer, matchedDrugs: parsed })
+    }
+
     const sourcesText = parsed
       .map((d, i) =>
         `Source ${i + 1} - ${d.name}${d.genericName ? ` (Generic: ${d.genericName})` : ''}${d.tradeName ? ` | Trade: ${d.tradeName}` : ''}${d.productCode ? ` | Code: ${d.productCode}` : ''}\n` +
@@ -262,17 +281,10 @@ async function postChat(req: AuthenticatedRequest) {
       )
       .join('\n---\n')
 
-    const systemPrompt = `You are NotiVet, a veterinary drug assistant for licensed HCPs and Pharmaceutical companies. This the primary goal of NotiVet: The purpose of the veterinary pharma app is to connect pharmaceutical companies and veterinarians in a seamless platform that delivers timely drug updates, personalized dosing guidance, and species-specific medication information. It enhances veterinary care by providing easy access to relevant drug data, smart notifications, and AI support, enabling better treatment decisions and improved animal health outcomes. This app also streamlines communication and helps identify cost-effective or more effective drug options, supporting efficient and evidence-based veterinary practice.
-Use the provided drug database excerpts to answer the user's question.
-- Be concise and clinically helpful.
-- Prefer authoritative info from the provided sources.
-- If unavailable in sources, clearly say you are uncertain (but do NOT say go to a veterinary pharmacology reference or veterinary professionals).
-- Include species-appropriateness and safety when relevant.
-- Do not fabricate data or dosing that isn't in the sources.`
+    const systemPrompt = `You are NotiVet, a veterinary drug assistant. Answer precisely and concisely in 3-6 short bullet points.\n- Use the provided drug database excerpts when relevant.\n- If the user is asking about a specific drug, summarize the key points succinctly (use, dosage if available, key warnings/safety, species fit).\n- Do not include a Sources section or any extra commentary.\n- Do not fabricate data.`
 
-    const userContent = `User question:\n${query}\n\nDrug database excerpts:\n${sourcesText || '(No directly matching entries found; answer based on general guidance and recommend checking database.)'}`
+    const userContent = `User question:\n${query}\n\nDrug database excerpts:\n${sourcesText || '(No matching excerpts)'}`
 
-    // Call OpenAI Chat Completions with GPT-4o
     const completionRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -300,7 +312,6 @@ Use the provided drug database excerpts to answer the user's question.
 
     return NextResponse.json({
       answer,
-      sources: parsed.map((d) => d.tradeName || d.name).filter(Boolean),
       matchedDrugs: parsed,
     })
   } catch (error) {

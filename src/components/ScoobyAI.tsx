@@ -119,14 +119,14 @@ export default function ScoobyAI({ onSendMessage, isLoading, onSaveDrug, savedDr
         </div>
 
         {/* Conversation Area */}
-        <div className="bg-[#F8F9FA] h-80 overflow-y-auto p-6 flex flex-col gap-4">
+        <div className="bg-[#F8F9FA] min-h-[420px] h-[520px] xl:h-[640px] overflow-y-auto p-6 flex flex-col gap-4">
           {messages.map((message) => (
             <div
               key={message.id}
               className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-2xl rounded-3xl px-4 py-3 shadow-sm ${
+                className={`max-w-3xl rounded-3xl px-4 py-3 shadow-sm ${
                   message.type === 'user'
                     ? 'bg-[#4376EC] text-white ml-8'
                     : 'bg-white text-gray-800 mr-8'
@@ -145,21 +145,13 @@ export default function ScoobyAI({ onSendMessage, isLoading, onSaveDrug, savedDr
                 <div className="text-sm leading-relaxed">
                   {message.content}
                 </div>
-                {message.sources && message.sources.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <div className="text-xs text-gray-600 font-medium mb-1">Sources:</div>
-                    <div className="text-xs text-gray-500">
-                      {message.sources.join(', ')}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           ))}
           
           {(isTyping || isLoading) && (
             <div className="flex justify-start">
-              <div className="bg-white text-gray-800 rounded-3xl px-4 py-3 shadow-sm mr-8 max-w-2xl">
+              <div className="bg-white text-gray-800 rounded-3xl px-4 py-3 shadow-sm mr-8 max-w-3xl">
                 <div className="text-[#4376EC] text-xs font-semibold uppercase tracking-wider mb-2">
                   AI Assistant
                 </div>
