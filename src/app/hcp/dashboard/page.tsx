@@ -66,7 +66,7 @@ export default function HCPDashboard() {
   const [filteredSavedDrugs, setFilteredSavedDrugs] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [savedSearchQuery, setSavedSearchQuery] = useState('')
-  const [chatbotLoading, setChatbotLoading] = useState(false)
+  const [aiAssistantLoading, setAiAssistantLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [removingDrug, setRemovingDrug] = useState<string | null>(null)
@@ -91,7 +91,7 @@ export default function HCPDashboard() {
     try {
       const params = new URLSearchParams(window.location.search)
       const tab = params.get('tab')
-      if (tab && ['drugs','chatbot','notifications','saved'].includes(tab)) {
+      if (tab && ['drugs','notifications','saved','chatbot'].includes(tab)) {
         setActiveTab(tab)
       }
       const highlight = params.get('highlight')
@@ -222,8 +222,8 @@ export default function HCPDashboard() {
     }
   }
 
-  const handleChatbotMessage = async (message: string) => {
-    setChatbotLoading(true)
+  const handleChatMessage = async (message: string) => {
+    setAiAssistantLoading(true)
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -232,7 +232,7 @@ export default function HCPDashboard() {
       })
       if (!response.ok) {
         const err = await response.json().catch(() => ({}))
-        throw new Error(err.error || 'Chatbot is unavailable right now. Please try again later.')
+        throw new Error(err.error || 'AI Assistant is unavailable right now. Please try again later.')
       }
       const data = await response.json()
       return {
@@ -243,7 +243,7 @@ export default function HCPDashboard() {
     } catch (error) {
       throw error
     } finally {
-      setChatbotLoading(false)
+      setAiAssistantLoading(false)
     }
   }
 
@@ -488,9 +488,9 @@ export default function HCPDashboard() {
           <nav className="-mb-px flex space-x-8">
             {[
               { id: 'drugs', name: 'Drug Database', icon: BookOpen },
-              { id: 'chatbot', name: 'Chatbot', icon: MessageSquare },
               { id: 'notifications', name: 'Notifications', icon: Bell, count: unreadNotificationCount },
-              { id: 'saved', name: 'Saved Drugs', icon: Heart }
+              { id: 'saved', name: 'Saved Drugs', icon: Heart },
+              { id: 'chatbot', name: 'AI Assistant', icon: MessageSquare }
             ].map(({ id, name, icon: Icon, count = 0 }) => (
               <button
                 key={id}
@@ -575,12 +575,12 @@ export default function HCPDashboard() {
           </div>
         )}
         
-        {/* Chatbot Tab */}
+        {/* AI Assistant Tab */}
         {activeTab === 'chatbot' && (
           <div className="flex justify-center py-6">
             <ScoobyAI 
-              onSendMessage={handleChatbotMessage}
-              isLoading={chatbotLoading}
+              onSendMessage={handleChatMessage}
+              isLoading={aiAssistantLoading}
               onSaveDrug={saveDrug}
               savedDrugIds={savedDrugIds}
             />

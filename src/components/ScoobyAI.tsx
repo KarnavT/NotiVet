@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Mic } from 'lucide-react'
+import { Send } from 'lucide-react'
 
 interface Message {
   id: string
@@ -104,10 +104,6 @@ export default function ScoobyAI({ onSendMessage, isLoading, onSaveDrug, savedDr
     }
   }
 
-  const handleAudioClick = () => {
-    // Audio functionality placeholder - not implemented yet per requirements
-    console.log('Audio recording feature coming soon!')
-  }
 
   return (
     <div className="w-full max-w-7xl mx-auto">
@@ -193,24 +189,14 @@ export default function ScoobyAI({ onSendMessage, isLoading, onSaveDrug, savedDr
               aria-label="Message input"
               disabled={isLoading}
             />
-            <div className="flex gap-2">
-              <button
-                onClick={handleAudioClick}
-                className="w-11 h-11 bg-[#4376EC] text-white rounded-lg flex items-center justify-center hover:bg-[#3366D6] transition-colors duration-200 group"
-                aria-label="Record audio message"
-                title="Audio recording (coming soon)"
-              >
-                <Mic className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleSend}
-                disabled={!inputValue.trim() || isLoading}
-                className="w-11 h-11 bg-[#4376EC] text-white rounded-lg flex items-center justify-center hover:bg-[#3366D6] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 group"
-                aria-label="Send message"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              onClick={handleSend}
+              disabled={!inputValue.trim() || isLoading}
+              className="w-11 h-11 bg-[#4376EC] text-white rounded-lg flex items-center justify-center hover:bg-[#3366D6] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 group"
+              aria-label="Send message"
+            >
+              <Send className="w-4 h-4" />
+            </button>
         </div>
         </div>
       </div>

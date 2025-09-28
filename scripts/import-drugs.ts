@@ -16,9 +16,10 @@ interface CSVRecord {
   'Trade Name(s):'?: string;
   'Distributor(s):'?: string;
   'Usage'?: string;
+  'Dosage_and_TimePeriod_original'?: string;
+  'Dosage_Source_Reference_original'?: string;
   'Dosage_and_TimePeriod'?: string;
   'Dosage_Source_Reference'?: string;
-  'Usage_Improved'?: string;
   [key: string]: any;
 }
 
@@ -86,7 +87,7 @@ async function importDrugs() {
     console.log('🚀 Starting drug import from CSV...')
     
     // Read CSV file
-    const csvContent = readFileSync('./data/AnimalDrugs.csv', 'utf-8')
+    const csvContent = readFileSync('./scripts/AnimalDrugs.csv', 'utf-8')
     
     // Parse CSV
     const records: CSVRecord[] = parse(csvContent, {
@@ -115,7 +116,6 @@ async function importDrugs() {
         const tradeName = cleanHtmlTags(record['Trade Name(s):'] || '')
         const distributors = cleanHtmlTags(record['Distributor(s):'] || '')
         const usage = cleanHtmlTags(record['Usage'] || '')
-        const usageImproved = cleanHtmlTags(record['Usage_Improved'] || '')
         const dosageAndTimePeriod = cleanHtmlTags(record['Dosage_and_TimePeriod'] || '')
         const dosageSourceReference = cleanHtmlTags(record['Dosage_Source_Reference'] || '')
         
@@ -140,8 +140,8 @@ async function importDrugs() {
             activeIngredient: agents,
             species: JSON.stringify(mappedSpecies),
             deliveryMethods: JSON.stringify(['INJECTABLE']), // Default delivery method
-            description: productTrueName !== primaryName ? productTrueName : undefined,
-            usage: usageImproved || usage || undefined, // Prefer improved usage if available
+            description: usage || (productTrueName !== primaryName ? productTrueName : undefined),
+            usage: usage || undefined,
             dosage: dosageAndTimePeriod || undefined, // Add recommended dosage
             productCode: productCode,
             establishmentCode: establishmentCode,

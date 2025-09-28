@@ -22,7 +22,7 @@ async function postChat(req: AuthenticatedRequest) {
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY
     if (!OPENAI_API_KEY) {
       return NextResponse.json(
-        { error: 'Chatbot is not configured on this deployment. Please set OPENAI_API_KEY on the server.' },
+        { error: 'AI Assistant is not configured on this deployment. Please set OPENAI_API_KEY on the server.' },
         { status: 503 }
       )
     }

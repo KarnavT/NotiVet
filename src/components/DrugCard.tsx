@@ -128,7 +128,7 @@ export default function DrugCard({ drug, saved, onSave, onUnsave, context = 'dat
               {isRemoving ? 'Removing...' : 'Remove'}
             </button>
           ) : (
-            /* Save Button for database/chatbot drugs */
+            /* Save Button for database/AI assistant drugs */
             <button
               type="button"
               onClick={() => !saved && onSave()}
