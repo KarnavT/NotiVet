@@ -46,10 +46,19 @@ async function postChat(req: AuthenticatedRequest) {
       bovine: 'BOVINE',
       bovines: 'BOVINE',
       cattle: 'BOVINE',
+      beef: 'BOVINE',
+      dairy: 'BOVINE',
       cow: 'BOVINE',
       cows: 'BOVINE',
+      steer: 'BOVINE',
+      steers: 'BOVINE',
+      heifer: 'BOVINE',
+      heifers: 'BOVINE',
+      bull: 'BOVINE',
+      bulls: 'BOVINE',
       calf: 'BOVINE',
       calves: 'BOVINE',
+      feedlot: 'BOVINE',
       equine: 'EQUINE',
       equines: 'EQUINE',
       horse: 'EQUINE',
@@ -93,7 +102,7 @@ async function postChat(req: AuthenticatedRequest) {
     // (covers phrases like "treat the cows", "for calves")
     const forcedSpecies = (() => {
       const q = query.toLowerCase()
-      if (/(\bcow\b|\bcows\b|\bcattle\b|\bcalf\b|\bcalves\b)/.test(q)) return 'BOVINE'
+      if (/(\bcow\b|\bcows\b|\bcattle\b|\bcalf\b|\bcalves\b|\bbeef\b|\bdairy\b|\bsteer\b|\bsteers\b|\bheifer\b|\bheifers\b|\bbull\b|\bbulls\b|\bfeedlot\b)/.test(q)) return 'BOVINE'
       if (/(\bdog\b|\bdogs\b|\bcanine\b|\bcanines\b)/.test(q)) return 'CANINE'
       if (/(\bcat\b|\bcats\b|\bfeline\b|\bfelines\b)/.test(q)) return 'FELINE'
       if (/(\bhorse\b|\bhorses\b|\bequine\b|\bequines\b)/.test(q)) return 'EQUINE'
@@ -208,6 +217,20 @@ async function postChat(req: AuthenticatedRequest) {
     }
 
     if (Array.isArray(drugs) && drugs.length > 0) {
+      const qLower = query.toLowerCase()
+      const wantsTreatment = /(\btreat\b|\btreatment\b|\btherapy\b|\btx\b)/.test(qLower) && !/(\bvaccine\b|\bvaccination\b|\bimmuni)/.test(qLower)
+      const wantsVaccine = /(\bvaccine\b|\bvaccination\b|\btoxoid\b|\bbacterin\b)/.test(qLower)
+
+      const antibioticHints = ['florfenicol','tulathromycin','tilmicosin','gamithromycin','tildipirosin','ceftiofur','enrofloxacin','danofloxacin','oxytetracycline']
+      const isVaccine = (d: any) => {
+        const hay = [d.name, d.tradeName, d.description, d.usage, d.activeIngredient].join(' ').toLowerCase()
+        return /(vaccine|bacterin|toxoid|modified\s*live|mlv)/.test(hay)
+      }
+      const isAntibiotic = (d: any) => {
+        const hay = [d.name, d.tradeName, d.description, d.usage, d.activeIngredient].join(' ').toLowerCase()
+        return antibioticHints.some((k) => hay.includes(k)) || /\b(antibiotic|antimicrobial)\b/.test(hay)
+      }
+
       const scored = drugs.map((d) => {
         const nameNorm = normalize(d.name)
         const tradeNorm = normalize(d.tradeName || '')
@@ -222,6 +245,9 @@ async function postChat(req: AuthenticatedRequest) {
           0
         )
         score += tokenHits * 5
+        if (wantsTreatment && isVaccine(d)) score -= 60
+        if (wantsTreatment && isAntibiotic(d)) score += 60
+        if (wantsVaccine && isVaccine(d)) score += 40
         return { d, score, allInName, allInTrade }
       })
 

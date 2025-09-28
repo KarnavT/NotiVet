@@ -636,43 +636,72 @@ export default function HCPDashboard() {
           </div>
         )}
         
-        {/* Chatbot (Legacy) Tab - restored UI */}
+        {/* AI Assistant (Chatbot) Tab — styled UI with ScoobyAI branding (plain-text answers) */}
         {activeTab === 'chatbot' && (
-          <div className="space-y-6">
-            <div className="flex space-x-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <textarea
-                  placeholder="Ask about drugs, dosing, interactions..."
-                  className="w-full pl-10 pr-4 py-2 h-40 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500 resize-none"
-                  value={chatbotInput}
-                  onChange={(e) => setChatbotInput(e.target.value)}
-                />
+          <div className="space-y-8">
+            {/* Header banner */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl p-6 shadow-lg">
+              <div className="flex items-center gap-3">
+                <MessageSquare className="w-6 h-6" />
+                <div>
+                  <h3 className="text-xl font-semibold">AI Assistant — ScoobyAI</h3>
+                  <p className="text-blue-100 text-sm">Ask about drugs, dosing, species fit, or interactions. ScoobyAI will search the database and reply concisely.</p>
+                </div>
               </div>
-              <button
-                onClick={handleChatbotAsk}
-                disabled={chatbotLoading || !chatbotInput.trim()}
-                className={`px-6 py-2 rounded-lg text-white ${
-                  chatbotLoading || !chatbotInput.trim() ? 'bg-blue-600 opacity-60 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-                }`}
-              >
-                {chatbotLoading ? 'Asking...' : 'Ask'}
-              </button>
             </div>
 
-            {chatbotError && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-sm text-red-700">{chatbotError}</p>
+            {/* Ask area */}
+            <div className="bg-white rounded-2xl shadow-sm border border-blue-100 p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-3 h-5 w-5 text-blue-400" />
+                  <textarea
+                    placeholder="Type your question for ScoobyAI..."
+                    className="w-full pl-10 pr-4 py-3 h-36 border-2 border-blue-100 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200 text-gray-900 placeholder-gray-500 resize-none shadow-sm hover:shadow-md"
+                    value={chatbotInput}
+                    onChange={(e) => setChatbotInput(e.target.value)}
+                  />
+                </div>
+                <div className="flex sm:flex-col gap-2 sm:w-40">
+                  <button
+                    onClick={handleChatbotAsk}
+                    disabled={chatbotLoading || !chatbotInput.trim()}
+                    className={`flex-1 px-6 py-3 rounded-xl text-white font-medium shadow-md transition-all duration-200 ${
+                      chatbotLoading || !chatbotInput.trim()
+                        ? 'bg-blue-500 opacity-60 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg'
+                    }`}
+                  >
+                    {chatbotLoading ? 'Asking…' : 'Ask ScoobyAI'}
+                  </button>
+                  {chatbotInput && (
+                    <button
+                      onClick={() => setChatbotInput('')}
+                      className="flex-1 px-6 py-3 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
               </div>
-            )}
+              {chatbotError && (
+                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-700">{chatbotError}</p>
+                </div>
+              )}
+            </div>
 
+            {/* Answer & matched drugs */}
             {chatbotAnswer && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Chatbot Answer</h3>
-                <p className="whitespace-pre-wrap text-gray-800">{chatbotAnswer}</p>
+              <div className="space-y-6">
+                <div className="bg-white rounded-2xl shadow-sm border border-blue-100 p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">ScoobyAI says</h3>
+                  <p className="whitespace-pre-wrap text-gray-800 leading-relaxed">{chatbotAnswer}</p>
+                </div>
+
                 {chatbotMatchedDrugs.length > 0 && (
-                  <div className="mt-6">
-                    <h4 className="text-md font-semibold text-gray-900 mb-3">Matched Drugs</h4>
+                  <div className="bg-white rounded-2xl shadow-sm border border-blue-100 p-6">
+                    <h4 className="text-md font-semibold text-gray-900 mb-4">Related Drugs Found</h4>
                     <div className="grid gap-6">
                       {chatbotMatchedDrugs.map((drug: any) => (
                         <DrugCard
