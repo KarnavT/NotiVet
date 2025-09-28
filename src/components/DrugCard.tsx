@@ -1,3 +1,5 @@
+'use client'
+
 import React from 'react'
 import { Heart, Check, MessageSquare, X } from 'lucide-react'
 import SpeciesIcons from './SpeciesIcons'
@@ -28,6 +30,35 @@ export default function DrugCard({ drug, saved, onSave, onUnsave, context = 'dat
   const speciesText = Array.isArray((drug as any).species)
     ? ((drug as any).species as string[]).join(', ')
     : (drug as any).species || ''
+
+  const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL || ''
+  const handleContactClick = () => {
+    // Prefer Gmail compose; if no email configured, do nothing
+    const to = contactEmail.trim()
+    if (!to) return
+
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}`
+
+    // Try opening in a new tab/window (most browsers allow this on direct click)
+    const w = window.open(gmailUrl, '_blank', 'noopener,noreferrer')
+    if (w) return
+
+    // Popup blocked: attempt programmatic anchor click
+    const a = document.createElement('a')
+    a.href = gmailUrl
+    a.target = '_blank'
+    a.rel = 'noopener noreferrer'
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+
+    // Final fallback: default mail client
+    setTimeout(() => {
+      try {
+        window.location.href = `mailto:${to}`
+      } catch {}
+    }, 200)
+  }
 
   return (
     <div className={`group bg-white rounded-xl border-2 ${
@@ -128,7 +159,7 @@ export default function DrugCard({ drug, saved, onSave, onUnsave, context = 'dat
               {isRemoving ? 'Removing...' : 'Remove'}
             </button>
           ) : (
-            /* Save Button for database/chatbot drugs */
+            /* Save Button for database/AI assistant drugs */
             <button
               type="button"
               onClick={() => !saved && onSave()}
@@ -148,10 +179,15 @@ export default function DrugCard({ drug, saved, onSave, onUnsave, context = 'dat
             </button>
           )}
 
-          {/* Contact Button */}
+{/* Contact Button */}
           <button
             type="button"
-            className="flex items-center justify-center px-4 py-2.5 rounded-lg transition-all duration-300 shadow-md text-sm font-medium bg-gray-600 hover:bg-gray-700 text-white transform hover:scale-105 hover:shadow-lg shadow-gray-200"
+            onClick={handleContactClick}
+            disabled={!contactEmail}
+            className={`flex items-center justify-center px-4 py-2.5 rounded-lg transition-all duration-300 shadow-md text-sm font-medium transform hover:scale-105 hover:shadow-lg shadow-gray-200 ${
+              contactEmail ? 'bg-gray-600 hover:bg-gray-700 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+            }`}
+            title={contactEmail ? `Compose email to ${contactEmail}` : 'Contact email not configured'}
           >
             <MessageSquare className="w-4 h-4 mr-2 transition-all duration-300 group-hover:scale-110" />
             Contact

@@ -66,7 +66,14 @@ export default function HCPDashboard() {
   const [filteredSavedDrugs, setFilteredSavedDrugs] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [savedSearchQuery, setSavedSearchQuery] = useState('')
+  const [aiAssistantLoading, setAiAssistantLoading] = useState(false)
+  // Legacy Chatbot UI state (from previous version)
+  const [chatbotInput, setChatbotInput] = useState('')
   const [chatbotLoading, setChatbotLoading] = useState(false)
+  const [chatbotAnswer, setChatbotAnswer] = useState('')
+  const [chatbotSources, setChatbotSources] = useState<string[]>([])
+  const [chatbotError, setChatbotError] = useState('')
+  const [chatbotMatchedDrugs, setChatbotMatchedDrugs] = useState<Drug[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [removingDrug, setRemovingDrug] = useState<string | null>(null)
@@ -91,7 +98,7 @@ export default function HCPDashboard() {
     try {
       const params = new URLSearchParams(window.location.search)
       const tab = params.get('tab')
-      if (tab && ['drugs','chatbot','notifications','saved'].includes(tab)) {
+      if (tab && ['drugs','notifications','saved','chatbot'].includes(tab)) {
         setActiveTab(tab)
       }
       const highlight = params.get('highlight')
@@ -222,13 +229,40 @@ export default function HCPDashboard() {
     }
   }
 
-  const handleChatbotMessage = async (message: string) => {
-    setChatbotLoading(true)
+  // AI Assistant (concise bullets) mode
+  const handleChatMessage = async (message: string) => {
+    setAiAssistantLoading(true)
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ query: message })
+        body: JSON.stringify({ query: message, mode: 'assistant' })
+      })
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.error || 'AI Assistant is unavailable right now. Please try again later.')
+      }
+      const data = await response.json()
+      return {
+        answer: data.answer || '',
+        sources: data.sources || [],
+        matchedDrugs: Array.isArray(data.matchedDrugs) ? data.matchedDrugs : []
+      }
+    } catch (error) {
+      throw error
+    } finally {
+      setAiAssistantLoading(false)
+    }
+  }
+
+  // Legacy Chatbot mode (original prompt with sources)
+  const handleChatbotMessage = async (message: string) => {
+    setAiAssistantLoading(true)
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ query: message, mode: 'legacy' })
       })
       if (!response.ok) {
         const err = await response.json().catch(() => ({}))
@@ -240,8 +274,35 @@ export default function HCPDashboard() {
         sources: data.sources || [],
         matchedDrugs: Array.isArray(data.matchedDrugs) ? data.matchedDrugs : []
       }
-    } catch (error) {
-      throw error
+    } finally {
+      setAiAssistantLoading(false)
+    }
+  }
+
+  // Legacy Chatbot ask handler for textarea UI
+  const handleChatbotAsk = async () => {
+    if (!chatbotInput.trim()) return
+    setChatbotLoading(true)
+    setChatbotAnswer('')
+    setChatbotSources([])
+    setChatbotError('')
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ query: chatbotInput, mode: 'legacy' })
+      })
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        setChatbotError(err.error || 'Chatbot is unavailable right now. Please try again later.')
+        return
+      }
+      const data = await response.json()
+      setChatbotAnswer(data.answer || '')
+      setChatbotSources(data.sources || [])
+      setChatbotMatchedDrugs(Array.isArray(data.matchedDrugs) ? data.matchedDrugs as any : [])
+    } catch (e) {
+      setChatbotError('Network error while contacting chatbot')
     } finally {
       setChatbotLoading(false)
     }
@@ -488,7 +549,7 @@ export default function HCPDashboard() {
           <nav className="-mb-px flex space-x-8">
             {[
               { id: 'drugs', name: 'Drug Database', icon: BookOpen },
-              { id: 'chatbot', name: 'Chatbot', icon: MessageSquare },
+              { id: 'chatbot', name: 'AI Assistant', icon: MessageSquare },
               { id: 'notifications', name: 'Notifications', icon: Bell, count: unreadNotificationCount },
               { id: 'saved', name: 'Saved Drugs', icon: Heart }
             ].map(({ id, name, icon: Icon, count = 0 }) => (
@@ -575,17 +636,90 @@ export default function HCPDashboard() {
           </div>
         )}
         
-        {/* Chatbot Tab */}
+        {/* AI Assistant (Chatbot) Tab — styled UI with ScoobyAI branding (plain-text answers) */}
         {activeTab === 'chatbot' && (
-          <div className="flex justify-center py-6">
-            <ScoobyAI 
-              onSendMessage={handleChatbotMessage}
-              isLoading={chatbotLoading}
-              onSaveDrug={saveDrug}
-              savedDrugIds={savedDrugIds}
-            />
+          <div className="space-y-8">
+            {/* Header banner */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl p-6 shadow-lg">
+              <div className="flex items-center gap-3">
+                <MessageSquare className="w-6 h-6" />
+                <div>
+                  <h3 className="text-xl font-semibold">AI Assistant — ScoobyAI</h3>
+                  <p className="text-blue-100 text-sm">Ask about drugs, dosing, species fit, or interactions. ScoobyAI will search the database and reply concisely.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Ask area */}
+            <div className="bg-white rounded-2xl shadow-sm border border-blue-100 p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-3 h-5 w-5 text-blue-400" />
+                  <textarea
+                    placeholder="Type your question for ScoobyAI..."
+                    className="w-full pl-10 pr-4 py-3 h-36 border-2 border-blue-100 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-300 transition-all duration-200 text-gray-900 placeholder-gray-500 resize-none shadow-sm hover:shadow-md"
+                    value={chatbotInput}
+                    onChange={(e) => setChatbotInput(e.target.value)}
+                  />
+                </div>
+                <div className="flex sm:flex-col gap-2 sm:w-40">
+                  <button
+                    onClick={handleChatbotAsk}
+                    disabled={chatbotLoading || !chatbotInput.trim()}
+                    className={`flex-1 px-6 py-3 rounded-xl text-white font-medium shadow-md transition-all duration-200 ${
+                      chatbotLoading || !chatbotInput.trim()
+                        ? 'bg-blue-500 opacity-60 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg'
+                    }`}
+                  >
+                    {chatbotLoading ? 'Asking…' : 'Ask ScoobyAI'}
+                  </button>
+                  {chatbotInput && (
+                    <button
+                      onClick={() => setChatbotInput('')}
+                      className="flex-1 px-6 py-3 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+              {chatbotError && (
+                <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-700">{chatbotError}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Answer & matched drugs */}
+            {chatbotAnswer && (
+              <div className="space-y-6">
+                <div className="bg-white rounded-2xl shadow-sm border border-blue-100 p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">ScoobyAI says</h3>
+                  <p className="whitespace-pre-wrap text-gray-800 leading-relaxed">{chatbotAnswer}</p>
+                </div>
+
+                {chatbotMatchedDrugs.length > 0 && (
+                  <div className="bg-white rounded-2xl shadow-sm border border-blue-100 p-6">
+                    <h4 className="text-md font-semibold text-gray-900 mb-4">Related Drugs Found</h4>
+                    <div className="grid gap-6">
+                      {chatbotMatchedDrugs.map((drug: any) => (
+                        <DrugCard
+                          key={drug.id}
+                          drug={drug}
+                          saved={savedDrugIds.has(drug.id)}
+                          onSave={() => !savedDrugIds.has(drug.id) && saveDrug(drug.id)}
+                          context="chatbot"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
+
         
         {/* Notifications Tab */}
         {activeTab === 'notifications' && (

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Mic } from 'lucide-react'
+import { Send } from 'lucide-react'
 
 interface Message {
   id: string
@@ -21,9 +21,10 @@ interface ScoobyAIProps {
   isLoading?: boolean
   onSaveDrug?: (drugId: string) => void
   savedDrugIds?: Set<string>
+  showSources?: boolean
 }
 
-export default function ScoobyAI({ onSendMessage, isLoading, onSaveDrug, savedDrugIds }: ScoobyAIProps) {
+export default function ScoobyAI({ onSendMessage, isLoading, onSaveDrug, savedDrugIds, showSources = false }: ScoobyAIProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -104,10 +105,6 @@ export default function ScoobyAI({ onSendMessage, isLoading, onSaveDrug, savedDr
     }
   }
 
-  const handleAudioClick = () => {
-    // Audio functionality placeholder - not implemented yet per requirements
-    console.log('Audio recording feature coming soon!')
-  }
 
   return (
     <div className="w-full max-w-7xl mx-auto">
@@ -123,14 +120,14 @@ export default function ScoobyAI({ onSendMessage, isLoading, onSaveDrug, savedDr
         </div>
 
         {/* Conversation Area */}
-        <div className="bg-[#F8F9FA] h-80 overflow-y-auto p-6 flex flex-col gap-4">
+        <div className="bg-[#F8F9FA] min-h-[360px] h-[460px] xl:h-[560px] overflow-y-auto p-6 flex flex-col gap-4">
           {messages.map((message) => (
             <div
               key={message.id}
               className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-2xl rounded-3xl px-4 py-3 shadow-sm ${
+                className={`max-w-3xl rounded-3xl px-4 py-3 shadow-sm ${
                   message.type === 'user'
                     ? 'bg-[#4376EC] text-white ml-8'
                     : 'bg-white text-gray-800 mr-8'
@@ -149,7 +146,7 @@ export default function ScoobyAI({ onSendMessage, isLoading, onSaveDrug, savedDr
                 <div className="text-sm leading-relaxed">
                   {message.content}
                 </div>
-                {message.sources && message.sources.length > 0 && (
+                {showSources && message.sources && message.sources.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-gray-200">
                     <div className="text-xs text-gray-600 font-medium mb-1">Sources:</div>
                     <div className="text-xs text-gray-500">
@@ -163,7 +160,7 @@ export default function ScoobyAI({ onSendMessage, isLoading, onSaveDrug, savedDr
           
           {(isTyping || isLoading) && (
             <div className="flex justify-start">
-              <div className="bg-white text-gray-800 rounded-3xl px-4 py-3 shadow-sm mr-8 max-w-2xl">
+              <div className="bg-white text-gray-800 rounded-3xl px-4 py-3 shadow-sm mr-8 max-w-3xl">
                 <div className="text-[#4376EC] text-xs font-semibold uppercase tracking-wider mb-2">
                   AI Assistant
                 </div>
@@ -193,24 +190,14 @@ export default function ScoobyAI({ onSendMessage, isLoading, onSaveDrug, savedDr
               aria-label="Message input"
               disabled={isLoading}
             />
-            <div className="flex gap-2">
-              <button
-                onClick={handleAudioClick}
-                className="w-11 h-11 bg-[#4376EC] text-white rounded-lg flex items-center justify-center hover:bg-[#3366D6] transition-colors duration-200 group"
-                aria-label="Record audio message"
-                title="Audio recording (coming soon)"
-              >
-                <Mic className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleSend}
-                disabled={!inputValue.trim() || isLoading}
-                className="w-11 h-11 bg-[#4376EC] text-white rounded-lg flex items-center justify-center hover:bg-[#3366D6] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 group"
-                aria-label="Send message"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              onClick={handleSend}
+              disabled={!inputValue.trim() || isLoading}
+              className="w-11 h-11 bg-[#4376EC] text-white rounded-lg flex items-center justify-center hover:bg-[#3366D6] disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 group"
+              aria-label="Send message"
+            >
+              <Send className="w-4 h-4" />
+            </button>
         </div>
         </div>
       </div>
