@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScoobyAI Chat Widget</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background-color: #F2F3F6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .chat-widget {
+            width: 100%;
+            max-width: 400px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+        }
+
+        .chat-header {
+            background-color: #4376EC;
+            color: white;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 80px;
+        }
+
+        .anchor-icon {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+
+        .chat-title {
+            font-weight: bold;
+            font-size: 18px;
+            letter-spacing: -0.025em;
+        }
+
+        .conversation-area {
+            background-color: #F8F9FA;
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message-bubble {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 16px;
+            margin: 0 20px 0 0;
+            max-width: 85%;
+            align-self: flex-start;
+        }
+
+        .sender-label {
+            color: #4376EC;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .message-text {
+            color: #374151;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #E5E7EB;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #D1D5DB;
+            border-radius: 24px;
+            font-size: 14px;
+            outline: none;
+            font-family: inherit;
+            transition: border-color 0.2s ease;
+        }
+
+        .message-input:focus {
+            border-color: #4376EC;
+            box-shadow: 0 0 0 3px rgba(67, 118, 236, 0.1);
+        }
+
+        .message-input::placeholder {
+            color: #9CA3AF;
+        }
+
+        .input-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-button {
+            width: 44px;
+            height: 44px;
+            background-color: #4376EC;
+            border: none;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+
+        .action-button:hover {
+            background-color: #3366D6;
+            transform: translateY(-1px);
+        }
+
+        .action-button:active {
+            transform: translateY(0);
+        }
+
+        .action-button svg {
+            width: 18px;
+            height: 18px;
+            fill: white;
+        }
+
+        .audio-button.recording {
+            background-color: #EF4444;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        /* Responsive design */
+        @media (max-width: 480px) {
+            .chat-widget {
+                max-width: 100%;
+                height: 100vh;
+                border-radius: 0;
+                margin: 0;
+            }
+
+            .conversation-area {
+                padding: 16px;
+            }
+
+            .message-bubble {
+                margin: 0;
+                max-width: 100%;
+            }
+
+            .input-container {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-widget">
+        <!-- Header -->
+        <div class="chat-header">
+            <svg class="anchor-icon" viewBox="0 0 24 24">
+                <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 7.5V9C15 10.66 13.66 12 12 12C10.34 12 9 10.66 9 9V7.5L3 7V9C3 10.09 3.29 11.12 3.8 12L5.5 12C5.19 11.37 5 10.7 5 10H7V14C7 15.1 7.9 16 9 16V22H11V16C12.1 16 13 15.1 13 14V10H15C15 10.7 14.81 11.37 14.5 12L16.2 12C16.71 11.12 17 10.09 17 9H19C19 14 16.39 18.39 12.66 20.16L13.66 21.58C18.78 19.55 22 15.54 22 11C22 10.76 21.97 10.53 21.94 10.3L21 9Z"/>
+            </svg>
+            <h1 class="chat-title">ScoobyAI</h1>
+        </div>
+
+        <!-- Conversation Area -->
+        <div class="conversation-area">
+            <div class="message-bubble">
+                <div class="sender-label">AI Assistant</div>
+                <div class="message-text">Hello! I am ScoobyAI. Ask me anything you'd like to know!</div>
+            </div>
+        </div>
+
+        <!-- Input Container -->
+        <div class="input-container">
+            <input 
+                type="text" 
+                class="message-input" 
+                placeholder="Type your message…"
+                aria-label="Message input"
+                id="messageInput"
+            >
+            <div class="input-buttons">
+                <button 
+                    class="action-button audio-button" 
+                    aria-label="Record audio message"
+                    id="audioButton"
+                    title="Record audio message"
+                >
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 2C13.1 2 14 2.9 14 4V12C14 13.1 13.1 14 12 14C10.9 14 10 13.1 10 12V4C10 2.9 10.9 2 12 2ZM19 10V12C19 15.3 16.3 18 13 18V20H15V22H9V20H11V18C7.7 18 5 15.3 5 12V10H7V12C7 14.2 8.8 16 11 16H13C15.2 16 17 14.2 17 12V10H19Z"/>
+                    </svg>
+                </button>
+                <button 
+                    class="action-button send-button" 
+                    aria-label="Send message"
+                    id="sendButton"
+                    title="Send message"
+                >
+                    <svg viewBox="0 0 24 24">
+                        <path d="M2,21L23,12L2,3V10L17,12L2,14V21Z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const audioButton = document.getElementById('audioButton');
+        const conversationArea = document.querySelector('.conversation-area');
+
+        // Audio recording state
+        let isRecording = false;
+        let mediaRecorder = null;
+        let audioStream = null;
+
+        // Send message functionality
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (message) {
+                addMessage('You', message, 'user');
+                messageInput.value = '';
+                
+                // Simulate AI response (replace with actual AI integration)
+                setTimeout(() => {
+                    addMessage('AI Assistant', 'Thanks for your message! This is where I would respond with AI-generated content.', 'assistant');
+                }, 1000);
+            }
+        }
+
+        // Add message to conversation
+        function addMessage(sender, text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message-bubble';
+            
+            if (type === 'user') {
+                messageDiv.style.alignSelf = 'flex-end';
+                messageDiv.style.marginLeft = '20px';
+                messageDiv.style.marginRight = '0';
+                messageDiv.style.backgroundColor = '#4376EC';
+            }
+
+            messageDiv.innerHTML = `
+                <div class="sender-label" style="${type === 'user' ? 'color: rgba(255,255,255,0.8);' : ''}">${sender}</div>
+                <div class="message-text" style="${type === 'user' ? 'color: white;' : ''}">${text}</div>
+            `;
+
+            conversationArea.appendChild(messageDiv);
+            conversationArea.scrollTop = conversationArea.scrollHeight;
+        }
+
+        // Audio recording functionality
+        async function toggleAudioRecording() {
+            if (!isRecording) {
+                try {
+                    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(audioStream);
+                    
+                    const audioChunks = [];
+                    
+                    mediaRecorder.ondataavailable = (event) => {
+                        audioChunks.push(event.data);
+                    };
+                    
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        // Here you would typically send the audio to your AI service
+                        addMessage('You', '🎤 Audio message sent', 'user');
+                        
+                        // Simulate AI response
+                        setTimeout(() => {
+                            addMessage('AI Assistant', 'I received your audio message! Audio processing would happen here.', 'assistant');
+                        }, 1000);
+                    };
+                    
+                    mediaRecorder.start();
+                    isRecording = true;
+                    audioButton.classList.add('recording');
+                    audioButton.title = 'Stop recording';
+                    
+                } catch (error) {
+                    console.error('Error accessing microphone:', error);
+                    alert('Could not access microphone. Please check your permissions.');
+                }
+            } else {
+                mediaRecorder.stop();
+                audioStream.getTracks().forEach(track => track.stop());
+                isRecording = false;
+                audioButton.classList.remove('recording');
+                audioButton.title = 'Record audio message';
+            }
+        }
+
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        audioButton.addEventListener('click', toggleAudioRecording);
+
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Focus input on load
+        messageInput.focus();
+    </script>
+</body>
+</html>
